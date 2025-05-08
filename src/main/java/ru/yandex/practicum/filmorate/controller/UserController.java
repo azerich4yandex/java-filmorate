@@ -1,6 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import java.time.LocalDate;
+import jakarta.validation.Valid;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.HashMap;
@@ -44,7 +44,7 @@ public class UserController {
      * @return {@link User} с заполненными созданными и генерируемыми значениями
      */
     @PostMapping
-    public User create(@RequestBody User user) {
+    public User create(@Valid @RequestBody User user) {
         log.info("Запрошено добавление пользователя");
         log.debug(user.toString());
 
@@ -53,7 +53,7 @@ public class UserController {
 
         // Устанавливаем id
         user.setId(getNextId());
-        log.info("Пользователь прошёл валидацию и получил id");
+        log.info("Пользователь получил id");
         log.debug(user.toString());
 
         // Сохраняем в хранилище
@@ -70,7 +70,7 @@ public class UserController {
      * @return {@link User} с изменёнными значениями
      */
     @PutMapping
-    public User update(@RequestBody User newUser) {
+    public User update(@Valid @RequestBody User newUser) {
         log.info("Запрошено изменение пользователя");
         log.debug(newUser.toString());
 
@@ -168,11 +168,6 @@ public class UserController {
         log.debug("Запускаем валидацию логина");
         validateLogin(user);
         log.debug("Валидация логина успешно завершена");
-
-        // Валидация даты рождения
-        log.debug("Запускаем валидацию даты рождения");
-        validateBirthday(user.getBirthday());
-        log.debug("Валидация даты рождения успешно завершена");
     }
 
     /***
@@ -181,23 +176,6 @@ public class UserController {
      * @param user экземпляр сущности {@link User}
      */
     private void validateEmail(User user) {
-        // Почта не должна быть пустой
-        if (user.getEmail() == null || user.getEmail().isBlank()) {
-            log.warn("Передана пустая электронная почта");
-            throw new ValidationException("Электронная почта не может быть пустой");
-        }
-        // Почта должна содержать символ @
-        if (!user.getEmail().contains("@")) {
-            log.warn("Передана электронная почта без символа \"@\" ({})", user.getEmail());
-            throw new ValidationException("Электронная почта должна содержать символ \"@\"");
-        }
-
-        // Почта должна содержать один символ @
-        if (user.getEmail().split("@").length != 2) {
-            log.warn("Передана электронная почта с несколькими символами \"@\" или без них ({})", user.getEmail());
-            throw new ValidationException("Электронная почта должна содержать один символ \"@\"");
-        }
-
         // Почта не должна быть ранее использована
         boolean exists = users.values().stream().anyMatch(
                 existingUser -> existingUser.getEmail().equals(user.getEmail()) && !existingUser.getId()
@@ -215,18 +193,6 @@ public class UserController {
      * @param user экземпляр сущности {@link User}
      */
     private void validateLogin(User user) {
-        // Логин не должен быть пустым
-        if (user.getLogin() == null || user.getLogin().isBlank()) {
-            log.warn("Передан пустой логин");
-            throw new ValidationException("Логин не может быть пустым");
-        }
-
-        // Логин не должен содержать пробелы
-        if (user.getLogin().contains(" ")) {
-            log.warn("Логин {} содержит пробелы", user.getLogin());
-            throw new ValidationException("Логин не может содержать пробелы");
-        }
-
         // Логин не должен быть ранее использован
         boolean exists = users.values().stream().anyMatch(
                 existingUser -> existingUser.getLogin().equals(user.getLogin()) && !existingUser.getId()
@@ -235,25 +201,6 @@ public class UserController {
         if (exists) {
             log.warn("Логин {} уже используется другим пользователем", user.getLogin());
             throw new ValidationException("Логин уде используется");
-        }
-    }
-
-    /***
-     * Валидация даты рождения сущности {@link User}.
-     * Вызывает исключение {@link ValidationException}
-     * @param birthday дата рождения
-     */
-    private void validateBirthday(LocalDate birthday) {
-        // Дата рождения не может быть пустой
-        if (birthday == null) {
-            log.warn("Передана пустая дата");
-            throw new ValidationException("Дата рождения не может быть пустой");
-        }
-
-        // Дата рождения не может быть в будущем
-        if (birthday.isAfter(LocalDate.now())) {
-            log.warn("Дата рождения ещё не наступила ({})", birthday.format(DATE_FORMATTER));
-            throw new ValidationException("Дата рождения не может быть в будущем");
         }
     }
 }
