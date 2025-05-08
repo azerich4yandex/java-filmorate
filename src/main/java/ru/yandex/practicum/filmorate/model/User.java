@@ -3,7 +3,6 @@ package ru.yandex.practicum.filmorate.model;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import java.time.LocalDate;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -61,11 +60,8 @@ public class User {
         }
     }
 
-    @AssertTrue(message="Логин не должен содержать пробелы.")
+    @AssertTrue(message = "Логин не должен содержать пробелы.")
     public boolean isValidLogin() {
-        if(login != null && !login.contains(" ")) {
-            return true;
-        }
-        return false;
+        return login != null && !login.contains(" ");
     }
 }
