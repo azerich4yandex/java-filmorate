@@ -25,6 +25,7 @@ public class FilmController {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final HashMap<Long, Film> films = new HashMap<>();
+    private long generatedId;
 
     /***
      * Обработка метода GET
@@ -78,8 +79,7 @@ public class FilmController {
         }
 
         // Ищем Film в хранилище по id
-        Optional<Film> existingFilmOpt = films.values().stream()
-                .filter(existingFilm -> existingFilm.getId().equals(newFilm.getId())).findFirst();
+        Optional<Film> existingFilmOpt = Optional.ofNullable(films.get(newFilm.getId()));
 
         // Проверяем успешность поиска по id
         if (existingFilmOpt.isEmpty()) {
@@ -138,6 +138,6 @@ public class FilmController {
      * @return Следующее значение для id
      */
     private Long getNextId() {
-        return films.values().stream().map(Film::getId).max(Long::compareTo).orElse(0L) + 1;
+        return ++generatedId;
     }
 }

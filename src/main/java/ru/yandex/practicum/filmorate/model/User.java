@@ -3,14 +3,17 @@ package ru.yandex.practicum.filmorate.model;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PastOrPresent;
 import java.time.LocalDate;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
 
 /***
  * User.
  */
+@Builder
 @Data
 public class User {
 
@@ -41,6 +44,7 @@ public class User {
     /***
      * Дата рождения пользователя
      */
+    @PastOrPresent
     private LocalDate birthday;
 
     public String getName() {
@@ -48,15 +52,6 @@ public class User {
             return login;
         } else {
             return name;
-        }
-    }
-
-    @AssertTrue(message = "Дата рождения не может быть в будущем")
-    public boolean isValidBirthdate() {
-        if (birthday != null) {
-            return !birthday.isAfter(LocalDate.now());
-        } else {
-            return true;
         }
     }
 

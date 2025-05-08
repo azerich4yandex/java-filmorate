@@ -25,6 +25,7 @@ public class UserController {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final HashMap<Long, User> users = new HashMap<>();
+    private long generatedId;
 
     /***
      * Обработка метода GET
@@ -81,8 +82,7 @@ public class UserController {
         }
 
         // Ищем User в хранилище по id
-        Optional<User> existingUserOpt = users.values().stream()
-                .filter(existingUser -> existingUser.getId().equals(newUser.getId())).findFirst();
+        Optional<User> existingUserOpt = Optional.ofNullable(users.get(newUser.getId()));
 
         // Проверяем успешность поиска по id
         if (existingUserOpt.isEmpty()) {
@@ -149,7 +149,7 @@ public class UserController {
      */
     private Long getNextId() {
         // Получаем новый id
-        return users.values().stream().map(User::getId).max(Long::compareTo).orElse(0L) + 1;
+        return ++generatedId;
     }
 
 
