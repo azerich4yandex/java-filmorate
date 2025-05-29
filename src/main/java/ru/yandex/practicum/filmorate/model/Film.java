@@ -1,55 +1,62 @@
 package ru.yandex.practicum.filmorate.model;
 
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 /**
- * Film.
+ * Фильм
  */
 @Builder
 @Data
+@EqualsAndHashCode(of = "id")
 public class Film {
 
-    /***
+    /**
+     * Список пользователей, которым понравился фильм
+     */
+    private final Map<Long, User> likes = new HashMap<>();
+    /**
      * Идентификатор сущности
      */
     private Long id;
-
-    /***
+    /**
      * Название
      */
-    @NotBlank(message = "Название не может быть пустым")
     private String name;
-
-    /***
+    /**
      * Описание
      */
-    @NotBlank(message = "Описание должно быть указано")
-    @Size(max = 200, message = "Максимальная длина описания - 200 символов")
     private String description;
-
-    /***
+    /**
      * Дата релиза
      */
     private LocalDate releaseDate;
-
-    /***
+    /**
      * Длительность
      */
-    @Positive(message = "Продолжительность фильма должна быть положительным числом")
     private Integer duration;
 
-    @AssertTrue(message = "Дата релиза - не раньше 28 декабря 1895 года")
-    public boolean isValidReleaseDate() {
-        if (releaseDate != null) {
-            return !releaseDate.isBefore(LocalDate.of(1895, 12, 28));
-        } else {
-            return true;
+    /**
+     * Метод добавляет в коллекцию лайков пользователя, которому понравился фильм
+     *
+     * @param user экземпляр класса {@link User}
+     */
+    public void addUsersLike(User user) {
+        if (!likes.containsKey(user.getId())) {
+            likes.put(user.getId(), user);
         }
+    }
+
+    /**
+     * Метод удаляет из коллекции лайков пользователя, которому фильм больше не нравится
+     *
+     * @param userId идентификатор пользователя
+     */
+    public void removeUsersLike(Long userId) {
+        likes.remove(userId);
     }
 }

@@ -1,143 +1,184 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import jakarta.validation.Valid;
-import java.time.format.DateTimeFormatter;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.service.FilmService;
 
-/***
- * Контроллер для обработки методов GET, POST и PUT для "/films"
+/**
+ * Контроллер для обработки HTTP-запросов для /films
  */
 @Slf4j
 @RestController
 @RequestMapping("/films")
 public class FilmController {
 
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    private final HashMap<Long, Film> films = new HashMap<>();
-    private long generatedId;
+    private final FilmService filmService;
 
-    /***
-     * Обработка метода GET
+    @Autowired
+    public FilmController(FilmService filmService) {
+        this.filmService = filmService;
+    }
+
+    /**
+     * Обработка GET-запроса на /films
+     *
      * @return коллекция сохранённых {@link Film}
      */
     @GetMapping
-    public Collection<Film> findAll() {
-        log.info("Запрошен список пользователей");
-        Collection<Film> result = films.values();
+    public ResponseEntity<Collection<Film>> findAll() {
+        log.info("Запрос всех пользователей на уровне контроллера");
+
+        Collection<Film> result = filmService.findAll();
         log.debug(result.toString());
-        return result;
+
+        log.info("Возврат результатов на уровень пользователя");
+        return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
-    /***
-     * Обработка метода POST
+    /**
+     * Обработка GET-запроса для /films/{id}
+     *
+     * @param id идентификатор {@link Film}
+     * @return экземпляр класса {@link Film} или null
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Film> findById(@PathVariable Long id) {
+        log.info("Поиск фильма по id на уровне контроллера");
+        log.debug("Передан id: {}", id);
+
+        Film film = filmService.findById(id);
+        log.debug(film.toString());
+
+        log.info("Возврат результата на уровень пользователя");
+        return new ResponseEntity<>(film, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /films/popular?count={count}
+     */
+    @GetMapping("/popular")
+    public ResponseEntity<Collection<Film>> findPopular(
+            @RequestParam(required = false, defaultValue = "10") Integer count) {
+        log.info("Поиск топ фильмов на уровне контроллера");
+        log.debug("Передано значение count = {}", count);
+
+        Collection<Film> result = filmService.findPopular(count);
+
+        log.info("Возвращение топ фильмов на уровень пользователя");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка POST-запроса для /films
+     *
      * @param film сущность {@link Film} из тела запроса
      * @return {@link Film} с заполненными созданными и генерируемыми значениями
      */
     @PostMapping
-    public Film create(@Valid @RequestBody Film film) {
-        log.info("Запрошено добавление фильма");
+    public ResponseEntity<Film> create(@RequestBody Film film) {
+        log.info("Запрошено добавление фильма на уровне контроллера");
         log.debug(film.toString());
 
-        // Устанавливаем id
-        film.setId(getNextId());
-        log.info("Фильм получил id");
-        log.debug(film.toString());
+        film = filmService.create(film);
 
-        // Сохраняем в хранилище
-        films.put(film.getId(), film);
-        log.info("Фильм добавлен в хранилище");
-
-        // Возвращаем результат
-        return film;
+        log.info("Возврат результата создания на уровень пользователя");
+        return new ResponseEntity<>(film, HttpStatus.CREATED);
     }
 
-    /***
-     * Обработка метода PUT
+    /**
+     * Обработка PUT-запроса для /films
+     *
      * @param newFilm сущность {@link Film} из тела запроса
      * @return {@link Film} с заполненными созданными и генерируемыми значениями
      */
     @PutMapping
-    public Film update(@Valid @RequestBody Film newFilm) {
-        log.info("Запрошено изменение фильма");
-        log.debug(newFilm.toString());
+    public ResponseEntity<Film> update(@RequestBody Film newFilm) {
+        log.info("Запрошено изменение фильма на уровне контроллера");
 
-        // Проверяем наличие id
-        if (newFilm.getId() == null) {
-            log.warn("При обновлении передан пустой id");
-            throw new ValidationException("Id должен быть указан");
-        }
+        Film existingFilm = filmService.update(newFilm);
 
-        // Ищем Film в хранилище по id
-        Optional<Film> existingFilmOpt = Optional.ofNullable(films.get(newFilm.getId()));
-
-        // Проверяем успешность поиска по id
-        if (existingFilmOpt.isEmpty()) {
-            log.warn("Фильм с id {} не найден в хранилище", newFilm.getId());
-            throw new ValidationException("Фильм с id " + newFilm.getId() + " не найден");
-        }
-
-        Film existingFilm = existingFilmOpt.get();
-        boolean valuesAreChanged = false;
-
-        // Проверим изменение названия
-        if (!newFilm.getName().equals(existingFilm.getName())) {
-            log.debug("Будет изменено название фильма с {} на {}", existingFilm.getName(), newFilm.getName());
-            existingFilm.setName(newFilm.getName());
-            valuesAreChanged = true;
-        }
-
-        // Проверим изменение описания
-        if (!newFilm.getDescription().equals(existingFilm.getDescription())) {
-            log.debug("Будет изменено описание фильма с {} на {}", existingFilm.getDescription(),
-                    newFilm.getDescription());
-            existingFilm.setDescription(newFilm.getDescription());
-        }
-
-        // Проверим изменение даты релиза
-        if (!newFilm.getReleaseDate().equals(existingFilm.getReleaseDate())) {
-            log.debug("Будет изменена дата релиза фильма с {} на {}",
-                    existingFilm.getReleaseDate().format(DATE_FORMATTER),
-                    newFilm.getReleaseDate().format(DATE_FORMATTER));
-            existingFilm.setReleaseDate(newFilm.getReleaseDate());
-        }
-
-        // Проверим изменение длительности
-        if (!newFilm.getDuration().equals(existingFilm.getDuration())) {
-            log.debug("Будет изменена длительность фильма с {} на {}", existingFilm.getDuration(),
-                    newFilm.getDuration());
-            existingFilm.setDuration(newFilm.getDuration());
-        }
-
-        // Если изменения данных были
-        if (valuesAreChanged) {
-            // Сохраняем изменения
-            log.debug("Сохраняем изменения");
-            films.put(existingFilm.getId(), existingFilm);
-            log.info("Изменения сохранены");
-        } else {
-            log.info("Изменения не обнаружены");
-        }
-
-        // Возвращаем результат
-        return newFilm;
+        log.info("Возврат результата обновления на уровень пользователя");
+        return new ResponseEntity<>(existingFilm, HttpStatus.OK);
     }
 
-    /***
-     * Генерация id для {@link Film}
-     * @return Следующее значение для id
+    /**
+     * Обработка PUT-запроса для /films/{filmId}/like/{userId}
+     *
+     * @param filmId идентификатор фильма
+     * @param userId идентификатор пользователя
      */
-    private Long getNextId() {
-        return ++generatedId;
+    @PutMapping("/{id}/like/{userId}")
+    public ResponseEntity<Void> addLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId) {
+        log.info("Запрошено добавление лайка фильму с filmId {} от пользователя с filmId {} на уровне контроллера",
+                filmId, userId);
+        log.debug("Передан filmId фильма: {}", filmId);
+        log.debug("Передан filmId пользователя: {}", userId);
+
+        filmService.addLike(filmId, userId);
+
+        log.info("Возврат результата добавления на уровень пользователя");
+        return new ResponseEntity<>(HttpStatus.OK);
     }
+
+    /**
+     * Обработка DELETE-запроса для /films/{id}/like/{userId}
+     *
+     * @param filmId идентификатор фильма
+     * @param userId идентификатор пользователя
+     */
+    @DeleteMapping("/{id}/like/{userId}")
+    public ResponseEntity<Void> removeLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId) {
+        log.info("Запрошено удаление лайка с фильма с id {} от пользователя с id {} на уровне контроллера", filmId,
+                userId);
+        log.debug("Передан id  фильма: {}", filmId);
+        log.debug("Передан id  пользователя: {}", userId);
+
+        filmService.removeLike(filmId, userId);
+
+        log.info("Возврат результата удаления лайка на уровень пользователя");
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * Обработка DELETE-запроса для /films/{id}
+     *
+     * @param filmId идентификатор фильма
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteFilm(@PathVariable(name = "id") Long filmId) {
+        log.info("Запрошено удаление фильма с id {} на уровне контроллера", filmId);
+
+        filmService.deleteFilm(filmId);
+
+        log.info("Возврат результата удаления на уровень пользователя");
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * Обработка DELETE-запроса для /films
+     */
+    @DeleteMapping
+    public ResponseEntity<Void> clearFilms() {
+        log.info("Запрошена очистка списка пользователей на уровне контроллера");
+
+        filmService.clearFilms();
+
+        log.info("Возврат результатов очистки на уровень пользователя");
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+
 }
