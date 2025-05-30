@@ -6,7 +6,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Objects;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -41,10 +40,11 @@ public class FilmService {
     public Collection<Film> findAll() {
         log.debug("Запрос всех фильмов на уровне сервиса");
 
-        Collection<Film> films = filmStorage.findAll();
+        Collection<Film> result = filmStorage.findAll();
+        log.debug("На уровень сервиса вернулась коллекция размером {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень контроллера");
-        return films;
+        return result;
     }
 
     /**
@@ -55,21 +55,19 @@ public class FilmService {
      * @throws ValidationException если передан пустой filmId
      */
     public Film findById(Long filmId) throws ValidationException {
-        log.debug("Поиск фильма по filmId на уровне сервиса");
+        log.debug("Поиск фильма по id на уровне сервиса");
 
         if (filmId == null) {
             throw new ValidationException("Передан пустой filmId");
         }
+        log.debug("Передан id фильма: {}", filmId);
 
-        Optional<Film> filmOpt = filmStorage.findById(filmId);
-
-        if (filmOpt.isEmpty()) {
-            log.warn("Фильм с id {} не найден", filmId);
-            throw new NotFoundException("Фильм с id " + filmId + " не найден");
-        }
+        Film film = filmStorage.findById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден"));
+        log.debug("Фильм с id {} найден в хранилище", film.getId());
 
         log.debug("Возврат результата поиска на уровень контроллера");
-        return filmOpt.get();
+        return film;
     }
 
     /**
@@ -81,19 +79,21 @@ public class FilmService {
     public Collection<Film> findPopular(Integer count) {
         log.debug("Поиск топ фильмов на уровне сервиса");
 
+        // Если аннотация в параметре контроллера была проигнорирована (запуск тестов напрямую без Mock)
         if (count == null) {
             count = 10;
         }
 
+        // Если передано отрицательное значение
         if (count <= 0) {
-            log.warn("Передано некорректное значение count: {}", count);
             throw new ValidationException("Значение count должно быть больше нуля");
         }
 
         Collection<Film> result = findAll().stream().filter(Objects::nonNull).filter(film -> !film.getLikes().isEmpty())
                 .sorted(Comparator.comparing((Film film) -> film.getLikes().size()).reversed()).limit(count).toList();
+        log.debug("Получена коллекция топ-фильмов размером {}", result.size());
 
-        log.debug("Возврат топ-{} поиска на уровень контроллера", count);
+        log.debug("Возврат коллекции топ-фильмов на уровень контроллера");
         return result;
     }
 
@@ -128,22 +128,17 @@ public class FilmService {
     public Film update(Film newFilm) throws ValidationException {
         log.debug("Обновление фильма на уровне сервиса");
 
-        log.debug("Валидация полученной модели");
-        validate(newFilm);
-        log.debug("Валидация модели  завершена");
-
         if (newFilm.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
 
-        Optional<Film> existingFilmOpt = filmStorage.findById(newFilm.getId());
+        log.debug("Валидация полученной модели");
+        validate(newFilm);
+        log.debug("Валидация модели  завершена");
 
-        if (existingFilmOpt.isEmpty()) {
-            log.warn("Фильм с id {} не найден для обновления", newFilm.getId());
-            throw new NotFoundException("Фильм с id " + newFilm.getId() + " не найден");
-        }
-
-        Film existingFilm = existingFilmOpt.get();
+        Film existingFilm = filmStorage.findById(newFilm.getId())
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + newFilm.getId() + " не найден"));
+        log.debug("Фильм с id {} найден в хранилище для обновления", existingFilm.getId());
         boolean valuesAreChanged = false;
 
         // Проверим изменение названия
@@ -167,12 +162,16 @@ public class FilmService {
                 log.debug("Будет изменена дата релиза фильма с {} на {}",
                         existingFilm.getReleaseDate().format(DATE_FORMATTER),
                         newFilm.getReleaseDate().format(DATE_FORMATTER));
+
                 existingFilm.setReleaseDate(newFilm.getReleaseDate());
+
                 valuesAreChanged = true;
             }
         } else {
             log.debug("Будет удалена дата релиза");
+
             existingFilm.setReleaseDate(null);
+
             valuesAreChanged = true;
         }
 
@@ -181,12 +180,16 @@ public class FilmService {
             if (!newFilm.getDuration().equals(existingFilm.getDuration())) {
                 log.debug("Будет изменена длительность фильма с {} на {}", existingFilm.getDuration(),
                         newFilm.getDuration());
+
                 existingFilm.setDuration(newFilm.getDuration());
+
                 valuesAreChanged = true;
             }
-        } else {
+        } else if (existingFilm.getDuration() != null) {
             log.debug("Будет удалена продолжительность");
+
             existingFilm.setDuration(null);
+
             valuesAreChanged = true;
         }
 
@@ -218,41 +221,30 @@ public class FilmService {
     public void addLike(Long filmId, Long userId) throws RuntimeException {
         log.debug("Добавление лайка фильму на уровне сервиса");
 
-        // Получаем фильм из хранилища
-        Optional<Film> filmOpt = filmStorage.findById(filmId);
-        Film film;
-        if (filmOpt.isPresent()) {
-            film = filmOpt.get();
-        } else {
-            log.warn("Фильм с id {} не найден в  хранилище", filmId);
-            throw new NotFoundException("Фильм с id " + filmId + " не найден в хранилище");
+        if (filmId == null) {
+            throw new ValidationException("Передан пустой id фильма");
         }
 
-        // Получаем пользователя из хранилища
-        Optional<User> userOpt = userStorage.findById(userId);
-        User user;
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
-        } else {
-            log.warn("Пользователь с id {} не найден в хранилище", userId);
-            throw new NotFoundException("Пользователь с id " + userId + " не найден в хранилище");
+        if (userId == null) {
+            throw new ValidationException("Передан пустой id пользователя");
         }
+
+        // Получаем фильм из хранилища
+        Film film = filmStorage.findById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден в хранилище"));
+
+        // Получаем пользователя из хранилища
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
 
         // Добавляем пользователя в коллекцию пользователей, которым фильм понравился
         log.debug("Добавляем пользователя с id {} в коллекцию любителей фильма с id {}", user.getId(), film.getId());
-        film.addUsersLike(user);
+        film.getLikes().add(user.getId());
 
         // Сохраняем изменения фильма в хранилище
         filmStorage.save(film);
 
-        // Добавляем фильм в коллекцию понравившихся пользователю фильмов
-        log.debug("Добавляем фильм с id {} в коллекцию фильмов пользователя с id {}", film.getId(), user.getId());
-        user.addLike(film);
-
-        // Сохраняем изменение пользователя в хранилище
-        userStorage.save(user);
-
-        log.debug("Отличный фильм!");
+        log.debug("Возврат результата добавления лайка на уровень контроллера");
     }
 
     public void removeLike(Long filmId, Long userId) {
@@ -264,45 +256,26 @@ public class FilmService {
             throw new ValidationException("Передан пустой идентификатор фильма при удалении лайка");
         }
 
-        Optional<Film> filmOpt = filmStorage.findById(filmId);
-        Film film;
-
-        if (filmOpt.isPresent()) {
-            film = filmOpt.get();
-        } else {
-            log.warn("Фильм с id {} не найден в хранилище ", filmId);
-            throw new NotFoundException("Фильм с id " + filmId + " не найден в хранилище");
-        }
+        Film film = filmStorage.findById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден в хранилище"));
 
         // Получаем пользователя из хранилища
         if (userId == null) {
             log.warn("Передан пустой идентификатор пользователя при удалении лайка");
             throw new ValidationException("Передан пустой идентификатор пользователя при удалении лайка");
         }
-        Optional<User> userOpt = userStorage.findById(userId);
-        User user;
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
-        } else {
-            log.warn("Пользователь с id {} не найдена хранилище ", userId);
-            throw new NotFoundException("Пользователь с id " + userId + " не найден в хранилище");
-        }
+
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
 
         // Удаляем лайк пользователя
         log.debug("Удаляем фильм с id {} из коллекции пользователя с id {}", film.getId(), user.getId());
-        film.removeUsersLike(userId);
+        film.getLikes().remove(userId);
 
         // Сохраняем изменение фильма в хранилище
         filmStorage.save(film);
 
-        // Удаляем пользователя из почитателей
-        log.debug("Удаляем пользователя с id {} из числа почитателей фильма с id {}", user.getId(), film.getId());
-        user.removeLike(film.getId());
-
-        // Сохраняем изменение пользователя
-        userStorage.save(user);
-
-        log.debug("Фильм уже не торт!");
+        log.debug("Возврат результата удаления лайка на уровень контроллера");
     }
 
     public void deleteFilm(Long filmId) {
@@ -314,28 +287,12 @@ public class FilmService {
         }
 
         // Получаем фильм из хранилища
-        Optional<Film> filmOpt = filmStorage.findById(filmId);
-        Film film;
-        if (filmOpt.isPresent()) {
-            film = filmOpt.get();
-        } else {
-            log.warn("Фильм с id {} не найден в хранилище", filmId);
-            throw new NotFoundException("Фильм с id " + filmId + " не найден в хранилище");
-        }
+        Film film = filmStorage.findById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден в хранилище"));
 
-        // Проверяем наличие лайков
-        if (!film.getLikes().isEmpty()) {
-            // Если лайки есть
-            log.debug("У фильма есть почитатели");
-            for (User user : film.getLikes().values()) {
-                // Удаляем каждый лайк фильма
-                user.removeLike(film.getId());
-                log.debug("Фильм больше не нравится пользователю c id {}", user.getId());
-
-                // И сохраняем изменение пользователя
-                userStorage.save(user);
-            }
-        }
+        // Удаляем лайки
+        film.getLikes().clear();
+        log.debug("У фильма с id {} удалены все лайки", film.getId());
 
         // Удаляем фильм
         filmStorage.delete(film.getId());
@@ -346,18 +303,9 @@ public class FilmService {
     public void clearFilms() {
         log.debug("Очистка списка фильмов на уровне сервиса");
 
-        // Получаем всех пользователей с избранными фильмами
-        for (User user : userStorage.findAll().stream().filter(u -> !u.getLikes().isEmpty()).toList()) {
-            // Очищаем лайки
-            user.getLikes().clear();
-            log.debug("Пользователю с id {} больше не нравятся фильмы", user.getId());
-
-            // Сохраняем изменения
-            userStorage.save(user);
-        }
-
         // Очищаем хранилище
         filmStorage.clear();
+        log.debug("Все фильмы удалены");
 
         log.debug("Возврат результатов очистки на уровень контроллера");
     }
@@ -370,24 +318,16 @@ public class FilmService {
      */
     private void validate(Film film) throws ValidationException {
         // Валидация наименования
-        log.debug("Запускаем валидацию наименования");
         validateName(film.getName());
-        log.debug("Валидация наименования успешно завершена");
 
         // Валидация описания
-        log.debug("Запускаем валидацию описания");
         validateDescription(film.getDescription());
-        log.debug("Валидация описания успешно завершена");
 
         // Валидация даты релиза
-        log.debug("Запускаем валидацию даты релиза");
         validateReleaseDate(film.getReleaseDate());
-        log.debug("Валидация даты релиза успешно завершена");
 
         // Валидация длительности
-        log.debug("Запускаем валидацию длительности");
         validateDuration(film.getDuration());
-        log.debug("Валидация длительности успешно завершена");
     }
 
     /**
@@ -397,11 +337,14 @@ public class FilmService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateName(String name) throws ValidationException {
+        log.debug("Запускаем валидацию наименования");
         // Наименование не должно быть пустым
         if (name == null || name.isBlank()) {
             log.debug("Передано пустое наименование");
             throw new ValidationException("Название не может быть пустым");
         }
+        log.debug("Передано корректное значение name: {}", name);
+        log.debug("Валидация наименования успешно завершена");
     }
 
     /**
@@ -411,17 +354,18 @@ public class FilmService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateDescription(String description) throws ValidationException {
+        log.debug("Запускаем валидацию описания");
         // Описание не должно быть пустым
         if (description == null || description.isBlank()) {
-            log.debug("Передано пустое описание");
             throw new ValidationException("Описание должно быть указано");
         }
 
         // Описание не должно быть длиннее 200 символов
         if (description.length() > 200) {
-            log.debug("Передано описание длиннее 200 символов");
             throw new ValidationException("Максимальная длина описания - 200 символов");
         }
+        log.debug("Передано корректное значение description: {}", description);
+        log.debug("Валидация описания успешно завершена");
     }
 
     /**
@@ -431,11 +375,14 @@ public class FilmService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateReleaseDate(LocalDate releaseDate) throws ValidationException {
+        log.debug("Запускаем валидацию даты релиза");
         // Дата релиза не должна быть раньше 28.12.2025
         if (releaseDate != null && releaseDate.isBefore(LocalDate.of(1895, 12, 28))) {
-            log.debug("Передана дата релиза раньше 28.12.2025 > {}", releaseDate.format(DATE_FORMATTER));
             throw new ValidationException("Дата релиза - не раньше 28 декабря 1895 года");
         }
+        log.debug("Передано корректное значение releaseDate: {}",
+                releaseDate == null ? "null" : releaseDate.format(DATE_FORMATTER));
+        log.debug("Валидация даты релиза успешно завершена");
     }
 
     /**
@@ -445,10 +392,13 @@ public class FilmService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateDuration(Integer duration) throws ValidationException {
+        log.debug("Запускаем валидацию длительности");
         // Длительность должна быть положительным числом
         if (duration != null && duration <= 0) {
             log.debug("Передано неположительное значение продолжительности 0 > {}", duration);
             throw new ValidationException("Продолжительность фильма должна быть положительным числом");
         }
+        log.debug("Передано корректное значение duration: {}", duration == null ? "null" : duration);
+        log.debug("Валидация длительности успешно завершена");
     }
 }

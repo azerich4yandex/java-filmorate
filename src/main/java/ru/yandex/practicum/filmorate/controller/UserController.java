@@ -1,7 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
 import java.util.Collection;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,7 +41,7 @@ public class UserController {
         log.info("Запрос всех пользователей на уровне контроллера");
 
         Collection<User> result = userService.findAll();
-        log.debug("Получена коллекция размером {} записей", result.size());
+        log.debug("На уровень контроллера вернулась коллекция размером {} записей", result.size());
 
         log.info("Возврат результатов на уровень пользователя");
         return new ResponseEntity<>(result, HttpStatus.OK);
@@ -59,12 +58,8 @@ public class UserController {
         log.info("Поиск пользователя по id на уровне контроллера");
         log.debug("Передан id: {}", id);
 
-        Optional<User> userOpt = userService.findById(id);
-
-        User user = null;
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
-        }
+        User user = userService.findById(id);
+        log.debug("На уровень контроллера вернулся пользователь с id {}", user.getId());
 
         log.info("Возврат результата на уровень пользователя");
         return new ResponseEntity<>(user, HttpStatus.OK);
@@ -74,7 +69,7 @@ public class UserController {
      * Обработка GET-запроса для /users/{id}/friends
      *
      * @param id идентификатор пользователя
-     * @return коллекция друзей пользователя
+     * @return коллекция идентификаторов друзей пользователя
      */
     @GetMapping("/{id}/friends")
     public ResponseEntity<Collection<User>> findFriends(@PathVariable Long id) {
@@ -82,6 +77,7 @@ public class UserController {
         log.debug("Передан id пользователя: {}", id);
 
         Collection<User> result = userService.findFriends(id);
+        log.debug("На уровень контроллера вернулась коллекция друзей размером {}", result.size());
 
         log.info("Возврат результатов поиска друзей на уровень пользователя");
         return new ResponseEntity<>(result, HttpStatus.OK);
@@ -101,6 +97,7 @@ public class UserController {
         log.debug("Передан id второго пользователя: {}", otherId);
 
         Collection<User> result = userService.findCommonFriends(id, otherId);
+        log.debug("На уровень контроллера вернулась коллекция общих друзей размером {}", result.size());
 
         log.info("Возврат результата поиска общих друзей на уровень пользователя");
         return new ResponseEntity<>(result, HttpStatus.OK);
@@ -117,6 +114,7 @@ public class UserController {
         log.info("Запрошено создание пользователя на уровне контроллера");
 
         user = userService.create(user);
+        log.debug("На уровень контроллера после добавления вернулся пользователь с id {}", user.getId());
 
         log.info("Возврат результата создания на уровень пользователя");
         return new ResponseEntity<>(user, HttpStatus.CREATED);
@@ -130,9 +128,10 @@ public class UserController {
      */
     @PutMapping
     public ResponseEntity<User> update(@RequestBody User newUser) {
-        log.info("Запрошено изменение пользователя");
+        log.info("Запрошено изменение пользователя на уровне контроллера");
 
         User existingUser = userService.update(newUser);
+        log.debug("На уровень контроллера после изменения вернулся пользователь с id {}", existingUser.getId());
 
         log.info("Возврат результата обновления на уровень пользователя");
         return new ResponseEntity<>(existingUser, HttpStatus.OK);
@@ -146,15 +145,15 @@ public class UserController {
      * @return статус успешности операции
      */
     @PutMapping("/{id}/friends/{friendId}")
-    public ResponseEntity<User> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
-        log.info("Запрошено добавление в друзья");
+    public ResponseEntity<Void> addFriend(@PathVariable Long id, @PathVariable Long friendId) {
+        log.info("Запрошено добавление в друзья на уровне контроллера");
         log.debug("Передан id основного пользователя: {}", id);
         log.debug("Передан id друга: {}", friendId);
 
-        User friend = userService.addFriend(id, friendId);
+        userService.addFriend(id, friendId);
 
         log.info("Возврат результата добавления на уровень пользователя");
-        return new ResponseEntity<>(friend, HttpStatus.OK);
+        return new ResponseEntity<>(HttpStatus.OK);
     }
 
     /**
@@ -183,10 +182,11 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
         log.info("Запрошено удаление пользователя на уровне контроллера");
+        log.info("Передан id удаляемого пользователя: {}", id);
 
         userService.deleteUser(id);
 
-        log.info("Пользователь удалён");
+        log.info("Возврат результата удаления на уровень пользователя");
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

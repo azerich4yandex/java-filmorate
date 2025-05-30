@@ -66,9 +66,9 @@ public class FilmControllerTest {
         userController.clearUsers();
     }
 
-    @DisplayName("Операции с фильмами")
+    @DisplayName("Добавление фильма без вызова исключений")
     @Test
-    void filmCreate() {
+    void shouldCreateOrUpdateFilmWithoutThrowingExceptions() {
         // Получаем список фильмов до добавления
         ResponseEntity<Collection<Film>> responseFilms = filmController.findAll();
         assertEquals(HttpStatus.OK, responseFilms.getStatusCode());
@@ -83,24 +83,96 @@ public class FilmControllerTest {
         assertNotNull(film1);
         assertNotNull(film1.getId());
 
-        // Получаем фильм по неизвестному id
-        assertThrows(NotFoundException.class, () -> filmController.findById(film1.getId() + 1));
+        // Устанавливаем пустую дату релиза
+        LocalDate tempDate = film1.getReleaseDate();
+        film1.setReleaseDate(null);
+        responseFilm = filmController.update(film1);
+        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
+        film1 = responseFilm.getBody();
+        assertNotNull(film1);
+        assertNull(film1.getReleaseDate());
+        film1.setReleaseDate(tempDate);
 
-        // Получаем список пользователей после добавления
+        // Устанавливаем пустое значение длительности
+        film1.setDuration(null);
+        responseFilm = filmController.update(film1);
+        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
+        film1 = responseFilm.getBody();
+        assertNotNull(film1);
+        assertNull(film1.getDuration());
+    }
+
+    @DisplayName("Получение фильма без вызова исключений")
+    @Test
+    void shouldReturnFilmWithoutThrowingExceptions() {
+        // Добавляем фильм
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+
+        responseFilm = filmController.findById(film1.getId());
+        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
+    }
+
+    @DisplayName("Вызов исключений при получении фильма по id")
+    @Test
+    void shouldThrowNotFoundOrValidationExceptionsWhenFindById() {
+        // Получаем фильма по отрицательному id
+        assertThrows(NotFoundException.class, () -> filmController.findById(-1000L));
+
+        // Получаем фильм по неизвестному id
+        assertThrows(NotFoundException.class, () -> filmController.findById(1000L));
+
+        // Получаем фильм по пустому id
+        assertThrows(ValidationException.class, () -> filmController.findById(null));
+    }
+
+    @DisplayName("Получение коллекции фильмов без вызова исключений")
+    @Test
+    void shouldReturnNotNullCollectionWhenFindAll() {
+        // Получаем пустую коллекцию
+        ResponseEntity<Collection<Film>> responseFilms = filmController.findAll();
+        assertEquals(HttpStatus.OK, responseFilms.getStatusCode());
+        Collection<Film> films = responseFilms.getBody();
+        assertNotNull(films);
+        assertTrue(films.isEmpty());
+
+        // Добавляем первый фильм
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+
+        // Добавляем второй фильм
+        responseFilm = filmController.create(film2);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+
+        // Добавляем третий фильм
+        responseFilm = filmController.create(film3);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+
+        // Получаем список фильмов после добавления
         responseFilms = filmController.findAll();
         assertEquals(HttpStatus.OK, responseFilms.getStatusCode());
         films = responseFilms.getBody();
         assertNotNull(films);
         assertFalse(films.isEmpty());
         assertTrue(films.contains(film1));
+        assertTrue(films.contains(film2));
+        assertTrue(films.contains(film3));
+    }
 
-        // Убираем наименование фильма
+    @DisplayName("Обновление фильма с вызовом исключений")
+    @Test
+    void shouldThrowValidationOrNotFoundExceptionsWhenUpdate() {
+        // Добавляем фильм
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+
+        // Устанавливаем пустое наименование фильма
         String tempString = film1.getName();
         film1.setName(null);
         assertThrows(ValidationException.class, () -> filmController.update(film1));
         film1.setName(tempString);
 
-        // Убираем описание фильма
+        // Устанавливаем пустое описание фильма
         tempString = film1.getDescription();
         film1.setDescription(null);
         assertThrows(ValidationException.class, () -> filmController.update(film1));
@@ -110,88 +182,75 @@ public class FilmControllerTest {
         assertThrows(ValidationException.class, () -> filmController.update(film1));
         film1.setDescription(tempString);
 
-        // Убираем дату релиза
-        LocalDate tempDate = film1.getReleaseDate();
-        film1.setReleaseDate(null);
-        responseFilm = filmController.update(film1);
-        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
-        film1 = responseFilm.getBody();
-        assertNotNull(film1);
-        assertNull(film1.getReleaseDate());
-
         // Устанавливаем дату релиза раньше минимальной даты
+        LocalDate tempDate = film1.getReleaseDate();
         film1.setReleaseDate(LocalDate.of(1895, 12, 28).minusDays(1));
         assertThrows(ValidationException.class, () -> filmController.update(film1));
         film1.setReleaseDate(tempDate);
 
-        // Устанавливаем пустое значение длительности
+        // Устанавливаем отрицательное значение длительности
         Integer tempInteger = film1.getDuration();
-        film1.setDuration(null);
-        responseFilm = filmController.update(film1);
-        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
-        film1 = responseFilm.getBody();
-        assertNotNull(film1);
-        assertNull(film1.getDuration());
-
-        // Устанавливаем отрицательное значение продолжительности
         film1.setDuration(-1 * tempInteger);
         assertThrows(ValidationException.class, () -> filmController.update(film1));
-
-        // Возвращаем значение продолжительности
         film1.setDuration(tempInteger);
-        responseFilm = filmController.update(film1);
-        assertEquals(HttpStatus.OK, responseFilm.getStatusCode());
-        film1 = responseFilm.getBody();
-        assertNotNull(film1);
-        assertEquals(tempInteger, film1.getDuration());
 
         // Устанавливаем неизвестный id
-        Long tempLong = film1.getId();
-        film1.setId(tempLong + 1);
+        film1.setId(film1.getId() * 100);
         assertThrows(NotFoundException.class, () -> filmController.update(film1));
-        film1.setId(tempLong);
+    }
+
+
+    @DisplayName("Удаление фильма без вызова исключений и вызов исключений при удалении")
+    @Test
+    void shouldDeleteOrThrowValidationOrNotFoundExceptions() {
+        // Добавляем фильм
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+        Long tempLong = film1.getId();
 
         // Удаляем фильм
         ResponseEntity<Void> responseVoid = filmController.deleteFilm(film1.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
         // Повторно удаляем тот же фильм
-        assertThrows(NotFoundException.class, () -> filmController.deleteFilm(film1.getId()));
+        assertThrows(NotFoundException.class, () -> filmController.deleteFilm(tempLong));
 
         // Удалям фильм с id == null
         assertThrows(ValidationException.class, () -> filmController.deleteFilm(null));
 
         // Удаляем фильм с несуществующим id
-        assertThrows(NotFoundException.class, () -> filmController.deleteFilm(film1.getId() * 100));
+        assertThrows(NotFoundException.class, () -> filmController.deleteFilm(tempLong * 100));
 
+        // Удаляем фильм с отрицательным id
+        assertThrows(NotFoundException.class, () -> filmController.deleteFilm(-1 * tempLong));
+    }
+
+    @DisplayName("Очистка хранилища фильмов без вызова исключений")
+    @Test
+    void shouldClearStorageWithoutThrowingException() {
         // Добавляем несколько фильмов
-        responseFilm = filmController.create(film1);
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
         assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
-        film1 = responseFilm.getBody();
         assertNotNull(film1);
         assertNotNull(film1.getId());
 
-        Film film2 = Film.builder().name(film1.getName()).description(film1.getDescription())
-                .releaseDate(film1.getReleaseDate()).duration(film1.getDuration()).build();
-
         responseFilm = filmController.create(film2);
         assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
-        film2 = responseFilm.getBody();
         assertNotNull(film2);
         assertNotNull(film2.getId());
         assertNotEquals(film1.getId(), film2.getId());
 
         // Получаем список фильмов из хранилища
-        responseFilms = filmController.findAll();
+        ResponseEntity<Collection<Film>> responseFilms = filmController.findAll();
         assertEquals(HttpStatus.OK, responseFilms.getStatusCode());
-        films = responseFilms.getBody();
+        Collection<Film> films = responseFilms.getBody();
         assertNotNull(films);
         assertFalse(films.isEmpty());
         assertTrue(films.contains(film1));
         assertTrue(films.contains(film2));
 
         // Очищаем хранилище
-        responseVoid = filmController.clearFilms();
+        ResponseEntity<Void> responseVoid = filmController.clearFilms();
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
         // Получаем список фильм из хранилища после удаления
@@ -202,9 +261,9 @@ public class FilmControllerTest {
         assertTrue(films.isEmpty());
     }
 
-    @DisplayName("Добавление/удаление лайков")
+    @DisplayName("Добавление/удаление/получение лайков без вызова исключений")
     @Test
-    void likesAdd() {
+    void shouldAddOrRemoveLikesWithOutThrowingException() {
         // Добавляем первого пользователя
         ResponseEntity<User> responseUser = userController.create(user1);
         assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
@@ -259,15 +318,8 @@ public class FilmControllerTest {
         responseVoid = filmController.addLike(film1.getId(), user3.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Добавляем лайк первому фильму от неизвестного пользователя
-        assertThrows(NotFoundException.class, () -> filmController.addLike(film1.getId(), user3.getId() * 100));
-
         // Добавляем лайк второму фильму от первого пользователя
         responseVoid = filmController.addLike(film2.getId(), user1.getId());
-        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
-
-        // Добавляем лайк второму фильму от второго пользователя
-        responseVoid = filmController.addLike(film2.getId(), user2.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
         // Получаем топ-2 фильмов
@@ -301,22 +353,16 @@ public class FilmControllerTest {
         assertFalse(films.contains(film3));
         assertEquals(2, films.size());
 
-        // Удаляем лайк первого пользователя со второго фильма
+        // Удаляем лайк второго фильма от первого пользователя
         responseVoid = filmController.removeLike(film2.getId(), user1.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Удаляем лайк второго пользователя с первого фильма
+        // Удаляем лайк второго фильма от второго пользователя
         responseVoid = filmController.removeLike(film2.getId(), user2.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Удаляем лайк неизвестного пользователя со второго фильма
-        assertThrows(NotFoundException.class, () -> filmController.removeLike(film2.getId(), user3.getId() * 100));
-
-        // Удаляем лайк null пользователя со второго фильма
-        assertThrows(ValidationException.class, () -> filmController.removeLike(film2.getId(), null));
-
-        // Получаем топ-1000 фильмов
-        responseFilms = filmController.findPopular(1000);
+        // Получаем топ-10 фильмов
+        responseFilms = filmController.findPopular(10);
         assertEquals(HttpStatus.OK, responseFilms.getStatusCode());
         films = responseFilms.getBody();
         assertNotNull(films);
@@ -325,5 +371,69 @@ public class FilmControllerTest {
         assertFalse(films.contains(film2));
         assertFalse(films.contains(film3));
         assertEquals(1, films.size());
+    }
+
+    @DisplayName("Добавление/удаление лайков с вызовом исключений")
+    @Test
+    void shouldThrowNotFoundOrValidationExceptionWhenAddingOrRemovingLike() {
+        // Добавляем первый фильм
+        ResponseEntity<Film> responseFilm = filmController.create(film1);
+        assertEquals(HttpStatus.CREATED, responseFilm.getStatusCode());
+        film1 = responseFilm.getBody();
+        assertNotNull(film1);
+        assertNotNull(film1.getId());
+
+        // Добавляем лайк неизвестного пользователя первому фильму
+        assertThrows(NotFoundException.class, () -> filmController.addLike(film1.getId(), 1L));
+
+        // Добавляем лайк null пользователя первому фильму
+        assertThrows(ValidationException.class, () -> filmController.addLike(film1.getId(), null));
+
+        // Добавляем лайк отрицательного пользователя первому фильму
+        assertThrows(NotFoundException.class, () -> filmController.addLike(film1.getId(), -1L));
+
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+        user1 = responseUser.getBody();
+        assertNotNull(user1);
+        assertNotNull((user1.getId()));
+
+        // Добавляем лайк первого пользователя первому фильму
+        ResponseEntity<Void> responseVoid = filmController.addLike(film1.getId(), user1.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Добавляем лайк первого пользователя неизвестному фильму
+        assertThrows(NotFoundException.class, () -> filmController.addLike(film1.getId() * 100, user1.getId()));
+
+        // Добавляем лайк первого пользователя null фильму
+        assertThrows(ValidationException.class, () -> filmController.addLike(null, user1.getId()));
+
+        // Добавляем лайк первого пользователя отрицательному фильму
+        assertThrows(NotFoundException.class, () -> filmController.addLike(-1 * film1.getId(), user1.getId()));
+
+        // Удаляем лайк первого пользователя первому фильму
+        responseVoid = filmController.removeLike(film1.getId(), user1.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Повторно удаляем лайк первого пользователя первому фильму
+        responseVoid = filmController.removeLike(film1.getId(), user1.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Удаляем лайк первого пользователя неизвестному фильму
+        assertThrows(NotFoundException.class, () -> filmController.removeLike(100 * film1.getId(), user1.getId()));
+
+        // Удаляем лайк первого пользователя null фильму
+        assertThrows(ValidationException.class, () -> filmController.removeLike(null, user1.getId()));
+
+        // Удаляем лайк первого пользователя отрицательному фильму
+        assertThrows(NotFoundException.class, () -> filmController.removeLike(-1 * film1.getId(), user1.getId()));
+
+        // Удаляем лайк null пользователя null фильму
+        assertThrows(ValidationException.class, () -> filmController.removeLike(null, null));
+
+        // Удаляем лайк неизвестного пользователя неизвестному фильму
+        assertThrows(NotFoundException.class,
+                () -> filmController.removeLike(100 * film1.getId(), 100 * user1.getId()));
     }
 }

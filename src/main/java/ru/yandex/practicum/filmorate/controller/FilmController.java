@@ -42,7 +42,7 @@ public class FilmController {
         log.info("Запрос всех пользователей на уровне контроллера");
 
         Collection<Film> result = filmService.findAll();
-        log.debug(result.toString());
+        log.debug("На уровень контроллера вернулась коллекция размером {}", result.size());
 
         log.info("Возврат результатов на уровень пользователя");
         return new ResponseEntity<>(result, HttpStatus.OK);
@@ -60,7 +60,7 @@ public class FilmController {
         log.debug("Передан id: {}", id);
 
         Film film = filmService.findById(id);
-        log.debug(film.toString());
+        log.debug("На уровень контроллера успешно вернулся фильм с id {}", film.getId());
 
         log.info("Возврат результата на уровень пользователя");
         return new ResponseEntity<>(film, HttpStatus.OK);
@@ -76,6 +76,7 @@ public class FilmController {
         log.debug("Передано значение count = {}", count);
 
         Collection<Film> result = filmService.findPopular(count);
+        log.debug("На уровень контроллера вернулась коллекция топ-фильмов размером {}", result.size());
 
         log.info("Возвращение топ фильмов на уровень пользователя");
         return new ResponseEntity<>(result, HttpStatus.OK);
@@ -90,9 +91,9 @@ public class FilmController {
     @PostMapping
     public ResponseEntity<Film> create(@RequestBody Film film) {
         log.info("Запрошено добавление фильма на уровне контроллера");
-        log.debug(film.toString());
 
         film = filmService.create(film);
+        log.debug("На уровень контроллера после добавления успешно вернулся фильм с id {}", film.getId());
 
         log.info("Возврат результата создания на уровень пользователя");
         return new ResponseEntity<>(film, HttpStatus.CREATED);
@@ -101,14 +102,16 @@ public class FilmController {
     /**
      * Обработка PUT-запроса для /films
      *
-     * @param newFilm сущность {@link Film} из тела запроса
+     * @param film сущность {@link Film} из тела запроса
      * @return {@link Film} с заполненными созданными и генерируемыми значениями
      */
     @PutMapping
-    public ResponseEntity<Film> update(@RequestBody Film newFilm) {
+    public ResponseEntity<Film> update(@RequestBody Film film) {
         log.info("Запрошено изменение фильма на уровне контроллера");
+        log.debug("Передан для обновления фильм с id {}", film.getId());
 
-        Film existingFilm = filmService.update(newFilm);
+        Film existingFilm = filmService.update(film);
+        log.debug("На уровень контроллера после изменения вернулся фильм с id {}", existingFilm.getId());
 
         log.info("Возврат результата обновления на уровень пользователя");
         return new ResponseEntity<>(existingFilm, HttpStatus.OK);
@@ -122,10 +125,9 @@ public class FilmController {
      */
     @PutMapping("/{id}/like/{userId}")
     public ResponseEntity<Void> addLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId) {
-        log.info("Запрошено добавление лайка фильму с filmId {} от пользователя с filmId {} на уровне контроллера",
-                filmId, userId);
-        log.debug("Передан filmId фильма: {}", filmId);
-        log.debug("Передан filmId пользователя: {}", userId);
+        log.info("Запрошено добавление лайка на уровне контроллера");
+        log.debug("Передан id фильма: {}", filmId);
+        log.debug("Передан id пользователя: {}", userId);
 
         filmService.addLike(filmId, userId);
 
@@ -141,8 +143,7 @@ public class FilmController {
      */
     @DeleteMapping("/{id}/like/{userId}")
     public ResponseEntity<Void> removeLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId) {
-        log.info("Запрошено удаление лайка с фильма с id {} от пользователя с id {} на уровне контроллера", filmId,
-                userId);
+        log.info("Запрошено удаление лайка на уровне контроллера");
         log.debug("Передан id  фильма: {}", filmId);
         log.debug("Передан id  пользователя: {}", userId);
 
@@ -159,7 +160,8 @@ public class FilmController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteFilm(@PathVariable(name = "id") Long filmId) {
-        log.info("Запрошено удаление фильма с id {} на уровне контроллера", filmId);
+        log.info("Запрошено удаление фильма на уровне контроллера");
+        log.debug("Передан id удаляемого фильма: {}", filmId);
 
         filmService.deleteFilm(filmId);
 

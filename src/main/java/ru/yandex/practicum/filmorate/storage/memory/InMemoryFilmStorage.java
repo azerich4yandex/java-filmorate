@@ -23,6 +23,7 @@ public class InMemoryFilmStorage implements FilmStorage {
         log.debug("Запрос всех фильмов на уровне хранилища");
 
         Collection<Film> result = films.values();
+        log.debug("На уровне хранилища получена коллекция размером {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень сервиса");
         return result;
@@ -30,10 +31,10 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public Optional<Film> findById(Long filmId) {
-        log.debug("Поиск фильма по filmId на уровне хранилища");
-        Film film = films.get(filmId);
+        log.debug("Поиск фильма по id на уровне хранилища");
 
-        log.debug("Фильм с filmId {} {} в хранилище", filmId, film == null ? "не найден" : "найден");
+        Film film = films.get(filmId);
+        log.debug("Фильм с id {} {} в хранилище", filmId, film == null ? "не найден" : "найден");
 
         log.debug("Возврат результата поиска на уровень сервиса");
         return Optional.ofNullable(film);
@@ -43,7 +44,11 @@ public class InMemoryFilmStorage implements FilmStorage {
     public Film create(Film film) {
         log.debug("Создание фильма на уровне хранилища");
 
-        film.setId(getNextId());
+        Long nextId = getNextId();
+        log.debug("Сгенерировано значение {}", nextId);
+
+        film.setId(nextId);
+        log.debug("Значение присвоено id присвоено фильму");
 
         save(film);
 
@@ -63,26 +68,22 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public void save(Film film) {
-        log.debug("Помещение изменений в хранилище");
+        log.debug("Сохранение в хранилище");
         films.put(film.getId(), film);
-        log.debug("Помещение изменений в хранилище завершено");
+        log.debug("Сохранение в хранилище завершено");
     }
 
     @Override
     public void delete(Long filmId) {
         log.debug("Удаление фильма на уровне хранилища");
-
         films.remove(filmId);
-
         log.debug("Удаление фильма завершено");
     }
 
     @Override
     public void clear() {
         log.debug("Очистка хранилища фильмов");
-
         films.clear();
-
         log.debug("Очистка хранилища завершена");
     }
 

@@ -4,18 +4,14 @@ import jakarta.validation.ValidationException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
 
 /**
@@ -27,12 +23,10 @@ public class UserService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final UserStorage userStorage;
-    private final FilmStorage filmStorage;
 
     @Autowired
-    public UserService(UserStorage userStorage, FilmStorage filmStorage) {
+    public UserService(UserStorage userStorage) {
         this.userStorage = userStorage;
-        this.filmStorage = filmStorage;
     }
 
     /**
@@ -43,31 +37,11 @@ public class UserService {
     public Collection<User> findAll() {
         log.debug("Запрос всех пользователей на уровне сервиса");
 
-        Collection<User> users = userStorage.findAll();
+        Collection<User> result = userStorage.findAll();
+        log.debug("На уровень сервиса вернулась коллекция размером {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень контроллера");
-        return users;
-    }
-
-    public Collection<User> findFriends(Long userId) {
-        log.debug("Запрос друзей пользователя на уровне сервиса");
-
-        log.debug("Поиск пользователя по id {}", userId);
-        Optional<User> userOpt = findById(userId);
-
-        log.debug("Возврат результатов на уровень контроллера");
-        return userOpt.map(user -> user.getFriends().values()).orElseGet(List::of);
-    }
-
-    public Collection<User> findCommonFriends(Long userId, Long friendId) {
-        log.debug("Запрос общих друзей двух пользователей на уровне сервиса");
-
-        Collection<User> userFriends = findFriends(userId);
-
-        Collection<User> friendFriends = findFriends(friendId);
-
-        log.debug("Возврат результатов поиска общих друзей на уровень контроллера");
-        return userFriends.stream().filter(Objects::nonNull).filter(friendFriends::contains).toList();
+        return result;
     }
 
     /**
@@ -77,22 +51,60 @@ public class UserService {
      * @return экземпляр класса {@link User}
      * @throws ValidationException если передан пустой userId
      */
-    public Optional<User> findById(Long userId) throws ValidationException {
-        log.debug("Поиск пользователя по userId на уровне сервиса");
+    public User findById(Long userId) throws ValidationException {
+        log.debug("Поиск пользователя по id на уровне сервиса");
 
         if (userId == null) {
             throw new ValidationException("Передан пустой userId");
         }
+        log.debug("Передан id пользователя: {}", userId);
 
-        Optional<User> userOpt = userStorage.findById(userId);
-
-        if (userOpt.isEmpty()) {
-            log.warn("Пользователь с id {} не найден в хранилище", userId);
-            throw new NotFoundException("Пользователь с id " + userId + " не найден в хранилище");
-        }
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+        log.debug("Найден пользователь с id {}", user.getId());
 
         log.debug("Возврат результата поиска на уровень контроллера");
-        return userOpt;
+        return user;
+    }
+
+    public Collection<User> findFriends(Long userId) {
+        log.debug("Запрос друзей пользователя на уровне сервиса");
+
+        if (userId == null) {
+            throw new NotFoundException("Передан пустой userId");
+        }
+        log.debug("Передан userId пользователя: {}", userId);
+
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+        log.debug("Найден пользователь с  id  {} ", user.getId());
+
+        Collection<User> result = userStorage.findAll().stream().filter(u -> user.getFriends().contains(u.getId()))
+                .toList();
+
+        log.debug("Возврат результатов на уровень контроллера");
+        return result;
+    }
+
+    public Collection<User> findCommonFriends(Long userId, Long friendId) {
+        log.debug("Запрос общих друзей двух пользователей на уровне сервиса");
+        log.debug("Передан id первого пользователя: {}", userId);
+        log.debug("Передан id второго пользователя: {}", friendId);
+
+        // Получаем список друзей пользователя
+        Collection<User> userFriends = findFriends(userId);
+
+        // Получаем список друзей друга
+        Collection<User> friendFriends = findFriends(friendId);
+
+        // Получаем пересечение коллекций
+        Collection<User> result = userFriends.stream().filter(Objects::nonNull).filter(friendFriends::contains)
+                .toList();
+        log.debug("Получен список общих друзей между пользователем с id {} и другом с id {} размером {}", userId,
+                friendId, result.size());
+
+        log.debug("Возврат результатов поиска общих друзей на уровень контроллера");
+        return result;
     }
 
     /**
@@ -132,19 +144,18 @@ public class UserService {
         if (newUser.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
+        log.debug("Передан пользователь с id: {}", newUser.getId());
 
-        Optional<User> existingUserOpt = userStorage.findById(newUser.getId());
-        boolean valuesAreChanged = false;
-
-        if (existingUserOpt.isEmpty()) {
-            log.debug("Пользователь с id {} не найден в хранилище", newUser.getId());
-            throw new NotFoundException("Пользователь с id " + newUser.getId() + " не найден в хранилище");
-        }
+        // Получаем пользователя из хранилища
+        User existingUser = userStorage.findById(newUser.getId()).orElseThrow(
+                () -> new NotFoundException("Пользователь с id " + newUser.getId() + " не найден в хранилище"));
+        log.debug("В хранилище найден пользователь по id {}", existingUser.getId());
 
         // Проверяем переданного пользователя
         validate(newUser);
 
-        User existingUser = existingUserOpt.get();
+        // Флаг необходимости изменения данных
+        boolean valuesAreChanged = false;
 
         // Проверяем изменение электронной почты
         if (!newUser.getEmail().equalsIgnoreCase(existingUser.getEmail())) {
@@ -157,7 +168,9 @@ public class UserService {
         // Проверяем изменение логина
         if (!newUser.getLogin().equals(existingUser.getLogin())) {
             log.debug("Будет изменён логин пользователя с {} на {}", existingUser.getLogin(), newUser.getLogin());
+
             existingUser.setLogin(newUser.getLogin());
+
             valuesAreChanged = true;
         }
 
@@ -165,7 +178,9 @@ public class UserService {
         if (!newUser.getName().equals(existingUser.getName())) {
             log.debug("Будет изменено отображаемое имя пользователя с {} на {}", existingUser.getName(),
                     newUser.getName());
+
             existingUser.setName(newUser.getName());
+
             valuesAreChanged = true;
         }
 
@@ -173,7 +188,9 @@ public class UserService {
         if (!newUser.getBirthday().equals(existingUser.getBirthday())) {
             log.debug("Будет изменена дата рождения пользователя с {} на {}",
                     existingUser.getBirthday().format(DATE_FORMATTER), newUser.getBirthday().format(DATE_FORMATTER));
+
             existingUser.setBirthday(newUser.getBirthday());
+
             valuesAreChanged = true;
         }
 
@@ -185,9 +202,7 @@ public class UserService {
             log.debug("Валидация обновлённой модели завершена");
 
             // Сохраняем изменения
-            log.debug("Сохраняем изменения");
             userStorage.update(existingUser);
-            log.info("Изменения сохранены");
         } else {
             log.info("Изменения не обнаружены");
         }
@@ -203,46 +218,45 @@ public class UserService {
      * @param friendId идентификатор друга
      * @throws RuntimeException при неожиданной ошибке
      */
-    public User addFriend(Long userId, Long friendId) throws RuntimeException {
+    public void addFriend(Long userId, Long friendId) throws RuntimeException {
         log.debug("Добавление друзей на уровне сервиса");
 
-        User user = null;
-        User friend = null;
+        if (userId == null) {
+            throw new ValidationException("Передан пустой userId");
+        }
+
+        if (friendId == null) {
+            throw new ValidationException("Передан пустой friendId");
+        }
 
         // Получаем основного пользователя
-        Optional<User> userOpt = findById(userId);
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
-        }
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
 
         // Получаем добавляемого друга
-        Optional<User> friendOpt = findById(friendId);
-        if (friendOpt.isPresent()) {
-            friend = friendOpt.get();
-        }
+        User friend = userStorage.findById(friendId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден в хранилище"));
 
         // Если все пользователи успешно получены
         if (user != null && friend != null) {
             // Добавляем пользователю друга в друзья
             log.debug("Добавляем друга с id {} в коллекцию пользователя с id {}", friendId, userId);
-            user.addFriend(friend);
+            user.getFriends().add(friend.getId());
 
             log.debug("Сохраняем изменение пользователя в хранилище");
             userStorage.save(user);
 
             // Добавляем другу пользователя в друзья
             log.debug("Добавляем пользователя с id {} в коллекцию друга с id {}", userId, friendId);
-            friend.addFriend(user);
+            friend.getFriends().add(user.getId());
 
             log.debug("Сохраняем изменение друга в хранилище");
             userStorage.save(friend);
         } else {
-            log.warn("Во время добавления в друзья произошла непредвиденная ошибка");
             throw new RuntimeException("Во время добавления в друзья произошла непредвиденная ошибка");
         }
 
         log.debug("Возвращаем результат добавления на уровень контроллера");
-        return friend;
     }
 
     /**
@@ -254,37 +268,37 @@ public class UserService {
     public void removeFriend(Long userId, Long friendId) {
         log.debug("Удаление друзей на уровне сервиса");
 
-        User user = null;
-        User friend = null;
-
-        // Получаем основного пользователя
-        Optional<User> userOpt = findById(userId);
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
+        if (userId == null) {
+            throw new ValidationException("Передан пустой userId");
         }
 
-        //Получаем удаляемого друга
-        Optional<User> friendOpt = findById(friendId);
-        if (friendOpt.isPresent()) {
-            friend = friendOpt.get();
+        if (friendId == null) {
+            throw new ValidationException("Передан пустой friendId");
         }
+
+        // Проверяем наличие пользователя
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+
+        // Проверяем наличие друга
+        User friend = userStorage.findById(friendId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден в хранилище"));
 
         // Если все пользователи успешно получены
         if (user != null && friend != null) {
             // Удаляем из друзей пользователя друга
             log.debug("Удаляем друга с id {} из друзей пользователя с id {}", friendId, userId);
-            user.removeFriend(friend.getId());
+            user.getFriends().remove(friend.getId());
 
             log.debug("Сохраняем изменение друзей пользователя в хранилище");
             userStorage.save(user);
 
             // Удаляем из друзей друга пользователя
-            friend.removeFriend(user.getId());
+            friend.getFriends().remove(user.getId());
 
             log.debug("Сохраняем изменение друзей друга в хранилище");
             userStorage.save(friend);
         } else {
-            log.warn("Во время удаления из друзей произошла непредвиденная ошибка");
             throw new RuntimeException("Во время удаления из друзей произошла непредвиденная ошибка");
         }
 
@@ -300,48 +314,26 @@ public class UserService {
         log.debug("Удаление пользователя на уровне сервиса");
 
         if (userId == null) {
-            log.warn("Передан пустой id");
             throw new ValidationException("Передан пустой id");
         }
 
         // Получаем пользователя из хранилища
-        Optional<User> userOpt = userStorage.findById(userId);
-        User user;
-        if (userOpt.isPresent()) {
-            user = userOpt.get();
-        } else {
-            log.warn("Пользователь с id {} не найден в хранилище ", userId);
-            throw new NotFoundException("Пользователь с id " + userId + " не найден");
-        }
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+        log.debug("В хранилище найден пользователь с  id  {} ", user.getId());
 
-        // Проверяем наличие лайков
-        if (!user.getLikes().isEmpty()) {
-            // Если лайки есть
-            log.debug("У пользователя есть коллекция любимых фильмов");
-            for (Film film : user.getLikes().values()) {
-                // Удаляем каждый лайк с фильма
-                film.removeUsersLike(user.getId());
-                log.debug("Фильм с id {} больше не нравится пользователю", film.getId());
-
-                // И сохраняем изменение фильма
-                filmStorage.save(film);
-            }
-        }
+        // Получаем друзей пользователя
+        Collection<Long> friends = user.getFriends().stream().toList();
 
         // Проверяем наличие друзей
-        if (!user.getFriends().isEmpty()) {
+        if (!friends.isEmpty()) {
             // Если друзья есть
             log.debug("У пользователя есть друзья");
-            for (User friend : user.getFriends().values()) {
-                // Удаляем друга
-                friend.removeFriend(user.getId());
-                log.debug("Пользователь больше не дружит с пользователем с id {}", friend.getId());
-
-                // Сохраняем изменения
-                userStorage.save(friend);
+            for (Long friendId : friends) {
+                // Удаляем дружбу с пользователем
+                removeFriend(friendId, user.getId());
             }
         }
-
         // Удаляем пользователя
         userStorage.delete(user.getId());
 
@@ -350,16 +342,6 @@ public class UserService {
 
     public void clearUsers() {
         log.debug("Очистка списка пользователей на уровне сервиса");
-
-        // Получаем все фильмы с лайками
-        for (Film film : filmStorage.findAll().stream().filter(f -> !f.getLikes().isEmpty()).toList()) {
-            // Очищаем лайки
-            film.getLikes().clear();
-            log.debug("Фильм с id {} больше никому не нравится", film.getId());
-
-            // Сохраняем изменения
-            filmStorage.save(film);
-        }
 
         // Очищаем хранилище
         userStorage.clear();
@@ -375,19 +357,13 @@ public class UserService {
      */
     private void validate(User user) throws ValidationException {
         // Валидация электронной почты
-        log.debug("Запускаем валидацию электронной почты");
         validateEmail(user);
-        log.debug("Валидация электронной успешно почты завершена");
 
         // Валидация логина
-        log.debug("Запускаем валидацию логина");
         validateLogin(user);
-        log.debug("Валидация логина успешно завершена");
 
         // Валидация даты рождения
-        log.debug("Запускаем валидацию даты рождения");
         validateBirthday(user);
-        log.debug("Валидация даты рождения успешно завершена");
     }
 
     /**
@@ -397,9 +373,9 @@ public class UserService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateEmail(User user) throws ValidationException {
+        log.debug("Запускаем валидацию электронной почты");
         // Почта не должна быть пустой
         if (user.getEmail() == null || user.getEmail().isBlank()) {
-            log.warn("Передан пустой почтовый адрес");
             throw new ValidationException("Передан пустой почтовый адрес");
         }
 
@@ -409,7 +385,6 @@ public class UserService {
         Matcher matcher = pattern.matcher(user.getEmail());
 
         if (!matcher.matches()) {
-            log.debug("Передан неправильный почтовый адрес {}", user.getEmail());
             throw new ValidationException("Передан неправильный почтовый адрес: " + user.getEmail());
         }
 
@@ -417,9 +392,10 @@ public class UserService {
         boolean exists = userStorage.isMailAlreadyUsed(user);
 
         if (exists) {
-            log.warn("Электронная почта {} уже используется другим пользователем", user.getEmail());
             throw new ValidationException("Электронная почта " + user.getEmail() + " уже используется");
         }
+        log.debug("Передано корректное значение email: {}", user.getEmail());
+        log.debug("Валидация электронной успешно почты завершена");
     }
 
     /**
@@ -429,6 +405,7 @@ public class UserService {
      * @throws ValidationException в случае ошибок валидации
      */
     private void validateLogin(User user) throws ValidationException {
+        log.debug("Запускаем валидацию логина");
         // Логин не должен быть пустой
         if (user.getLogin() == null) {
             throw new ValidationException("Передан пустой логин");
@@ -447,6 +424,8 @@ public class UserService {
             log.warn("Логин {} уже используется другим пользователем", user.getLogin());
             throw new ValidationException("Логин " + user.getLogin() + " уже используется");
         }
+        log.debug("Передано корректное значение login: {}", user.getLogin());
+        log.debug("Валидация логина успешно завершена");
     }
 
     /**
@@ -455,14 +434,15 @@ public class UserService {
      * @param user экземпляр класса {@link User}
      */
     private void validateBirthday(User user) {
+        log.debug("Запускаем валидацию даты рождения");
         if (user.getBirthday() == null) {
-            log.warn("Передана пустая дата рождения");
             throw new ValidationException("Дата рождения должна быть указана");
         }
 
         if (user.getBirthday().isAfter(LocalDate.now())) {
-            log.debug("Передана дата рождения из будущего: {}", user.getBirthday().format(DATE_FORMATTER));
             throw new ValidationException("Дата рождения должна быть меньше текущей даты");
         }
+        log.debug("Передано корректное значение birthday: {}", user.getBirthday().format(DATE_FORMATTER));
+        log.debug("Валидация даты рождения успешно завершена");
     }
 }

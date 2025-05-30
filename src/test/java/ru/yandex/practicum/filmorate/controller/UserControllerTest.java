@@ -2,7 +2,6 @@ package ru.yandex.practicum.filmorate.controller;
 
 import jakarta.validation.ValidationException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Collection;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,11 +37,9 @@ public class UserControllerTest {
 
     @BeforeEach
     void init() {
-        user1 = User.builder().name("a").email("a@mail.ru").login("A").birthday(LocalDate.now().minusYears(20)).build();
-
-        user2 = User.builder().name("b").email("b@mail.ru").login("B").birthday(LocalDate.now().minusYears(20)).build();
-
-        user3 = User.builder().name("c").email("c@mail.ru").login("C").birthday(LocalDate.now().minusYears(20)).build();
+        user1 = User.builder().name("a").email("a@mail.ru").login("A").birthday(LocalDate.now().minusYears(21)).build();
+        user2 = User.builder().name("b").email("b@mail.ru").login("B").birthday(LocalDate.now().minusYears(22)).build();
+        user3 = User.builder().name("c").email("c@mail.ru").login("C").birthday(LocalDate.now().minusYears(23)).build();
     }
 
     @AfterEach
@@ -51,9 +48,9 @@ public class UserControllerTest {
         userController.clearUsers();
     }
 
-    @DisplayName("Операции с пользователями")
+    @DisplayName("Добавление пользователя без вызова исключений")
     @Test
-    void userCreate() {
+    void shouldCreateOrUpdateUserWithoutThrowingException() {
         // Получаем список пользователей до добавления
         ResponseEntity<Collection<User>> responseUsers = userController.findAll();
         assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
@@ -68,6 +65,69 @@ public class UserControllerTest {
         assertNotNull(user1);
         assertNotNull(user1.getId());
 
+        // Устанавливаем пустое имя
+        user2.setName(null);
+        responseUser = userController.create(user2);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+        user2 = responseUser.getBody();
+        assertNotNull(user2);
+        assertNotNull(user2.getId());
+        assertEquals(user2.getLogin(), user2.getName());
+    }
+
+    @DisplayName("Получение пользователя без вызова исключений")
+    @Test
+    void shouldReturnUserWithoutThrowingExceptions() {
+        // Добавляем пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+        user1 = responseUser.getBody();
+        assertNotNull(user1);
+        assertNotNull(user1.getId());
+
+        responseUser = userController.findById(user1.getId());
+        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
+        User user = responseUser.getBody();
+        assertNotNull(user);
+        assertNotNull(user);
+        assertEquals(user1, user);
+    }
+
+    @DisplayName("Вызов исключений при получении пользователя по id")
+    @Test
+    void shouldThrowNotFoundOrValidationExceptionWhenFindById() {
+        // Получаем пользователя по отрицательному id
+        assertThrows(NotFoundException.class, () -> userController.findById(-1L));
+
+        // Получаем пользователя по неизвестному id
+        assertThrows(NotFoundException.class, () -> userController.findById(5L));
+
+        // Получаем пользователя по пустому id
+        assertThrows(ValidationException.class, () -> userController.findById(null));
+    }
+
+    @DisplayName("Получение коллекции пользователей без вызова исключений")
+    @Test
+    void shouldReturnNotNullCollectionWhenFindAll() {
+        // Получаем пустую коллекцию
+        ResponseEntity<Collection<User>> responseUsers = userController.findAll();
+        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
+        Collection<User> users = responseUsers.getBody();
+        assertNotNull(users);
+        assertTrue(users.isEmpty());
+
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+
+        // Добавляем второго пользователя
+        responseUser = userController.create(user2);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+
+        // Добавляем третьего пользователя
+        responseUser = userController.create(user3);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+
         // Получаем список пользователей после добавления
         responseUsers = userController.findAll();
         assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
@@ -75,132 +135,119 @@ public class UserControllerTest {
         assertNotNull(users);
         assertFalse(users.isEmpty());
         assertTrue(users.contains(user1));
+        assertTrue(users.contains(user2));
+        assertTrue(users.contains(user3));
+    }
 
-        // Убираем имя пользователя
-        String tempString = user1.getName();
-        user1.setName(null);
-        responseUser = userController.update(user1);
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-        user1 = responseUser.getBody();
-        assertNotNull(user1);
-        assertEquals(user1.getLogin(), user1.getName());
+    @DisplayName("Обновление пользователя с вызовом исключений")
+    @Test
+    void shouldThrowValidationOrNotFoundExceptionWhenUpdate() {
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
-        // Возвращаем имя пользователя
-        user1.setName(tempString);
-        responseUser = userController.update(user1);
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-        user1 = responseUser.getBody();
+        // Добавляем второго пользователя
+        responseUser = userController.create(user2);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
-        // Убираем адрес пользователя
+        // Устанавливаем неизвестный id
+        Long tempLong = user1.getId();
+        user1.setId(tempLong * 10);
+        assertThrows(NotFoundException.class, () -> userController.update(user1));
+        user1.setId(tempLong);
+
+        // Устанавливаем пустой логин
+        String tempString = user1.getLogin();
+        user1.setLogin(null);
+        assertThrows(ValidationException.class, () -> userController.update(user1));
+
+        // Устанавливаем логин с пробелами
+        user1.setLogin(tempString + " " + tempString);
+        assertThrows(ValidationException.class, () -> userController.update(user1));
+
+        // Устанавливаем повторяющийся логин
+        user1.setLogin(user2.getLogin());
+        assertThrows(ValidationException.class, () -> userController.update(user1));
+        user1.setLogin(tempString);
+
+        // Устанавливаем пустую почту
         tempString = user1.getEmail();
         user1.setEmail(null);
         assertThrows(ValidationException.class, () -> userController.update(user1));
 
-        // Ставим неправильный адрес пользователя
-        user1.setEmail("@@.ru");
+        // Устанавливаем неправильную почту
+        user1.setEmail(" a@@.ru");
         assertThrows(ValidationException.class, () -> userController.update(user1));
 
-        // Ставим повторяющийся адрес почты
+        // Устанавливаем повторяющуюся почту
+        user1.setEmail(user2.getEmail());
+        assertThrows(ValidationException.class, () -> userController.update(user1));
         user1.setEmail(tempString);
-        tempString = user2.getEmail();
-        user2.setEmail(user1.getEmail());
-
-        assertThrows(ValidationException.class, () -> userController.create(user2));
-        user2.setEmail(tempString);
-
-        // Убираем логин пользователя
-        tempString = user1.getLogin();
-        user1.setLogin(null);
-        assertThrows(ValidationException.class, () -> userController.update(user1));
-
-        // Устанавливаем неправильный логин
-        user1.setLogin("a a");
-        assertThrows(ValidationException.class, () -> userController.update(user1));
-
-        // Устанавливаем повторяющийся логин
-        user1.setLogin(tempString);
-        tempString = user2.getLogin();
-        user2.setLogin(user1.getLogin());
-        assertThrows(ValidationException.class, () -> userController.create(user2));
-        user2.setLogin(tempString);
 
         // Устанавливаем пустую дату рождения
         user1.setBirthday(null);
         assertThrows(ValidationException.class, () -> userController.update(user1));
 
-        // Устанавливаем неправильную дату рождения
+        // Устанавливаем дату рождения из будущего
         user1.setBirthday(LocalDate.now().plusYears(1));
         assertThrows(ValidationException.class, () -> userController.update(user1));
-        user1.setBirthday(LocalDate.now().minusYears(20));
+    }
 
-        // Устанавливаем неизвестный id
-        Long tempId = user1.getId();
-        user1.setId(user1.getId() + 1);
-        assertThrows(NotFoundException.class, () -> userController.update(user1));
-        user1.setId(tempId);
+    @DisplayName("Корректное и некорректное удаление пользователя")
+    @Test
+    void shouldDeleteOrThrowValidationOrNotFoundExceptions() {
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
-        // Удаляем сохранённого пользователя
+        // Удаляем фильм
         ResponseEntity<Void> responseVoid = userController.deleteUser(user1.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Удаляем несохранённого пользователя
-        assertThrows(NotFoundException.class, () -> userController.deleteUser(user1.getId() + 1));
+        // Повторно удаляем тот же фильм
+        assertThrows(NotFoundException.class, () -> userController.deleteUser(user1.getId()));
 
-        // Удаляем пользователя с id = null
+        // Удаляем фильм с несуществующим id
+        assertThrows(NotFoundException.class, () -> userController.deleteUser(user1.getId() * 100));
+
+        // Удаляем фильм с отрицательным id
+        assertThrows(NotFoundException.class, () -> userController.deleteUser(-1 * user1.getId()));
+
+        // Удаляем фильм с null id
         assertThrows(ValidationException.class, () -> userController.deleteUser(null));
 
-        // Получаем список пользователей после удаления
-        responseUsers = userController.findAll();
-        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
-        users = responseUsers.getBody();
-        assertNotNull(users);
-        assertTrue(users.isEmpty());
+    }
 
-        // Добавляем всех пользователей
-        user1.setId(null);
-        user2.setId(null);
-        user3.setId(null);
-        responseUser = userController.create(user1);
+    @DisplayName("Очистка хранилища пользователей без вызова исключений")
+    @Test
+    void shouldClearStorageWithoutThrowingException() {
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
         assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
-        user1 = responseUser.getBody();
+
+        // Добавляем второго пользователя
         responseUser = userController.create(user2);
         assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
-        user2 = responseUser.getBody();
+
+        // Добавляем третьего пользователя
         responseUser = userController.create(user3);
         assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
-        user3 = responseUser.getBody();
-        Collection<User> expectedUsers = new ArrayList<>();
-        expectedUsers.add(user1);
-        expectedUsers.add(user2);
-        expectedUsers.add(user3);
 
-        // Получаем список всех пользователей после добавления
-        responseUsers = userController.findAll();
+        // Получаем список пользователей из хранилища
+        ResponseEntity<Collection<User>> responseUsers = userController.findAll();
         assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
-        users = responseUsers.getBody();
+        Collection<User> users = responseUsers.getBody();
         assertNotNull(users);
         assertFalse(users.isEmpty());
-        assertEquals(expectedUsers.size(), users.size());
         assertTrue(users.contains(user1));
         assertTrue(users.contains(user2));
         assertTrue(users.contains(user3));
 
-        // Получаем пользователя по известному id
-        responseUser = userController.findById(user1.getId());
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-        user1 = responseUser.getBody();
-        assertNotNull(user1);
-        assertNotNull(user1.getId());
-
-        // Получаем пользователя по неизвестному id
-        assertThrows(NotFoundException.class, () -> userController.findById(user3.getId() * 100));
-
-        // Получаем пользователя по пустому id
-        assertThrows(ValidationException.class, () -> userController.findById(null));
-
-        // Очищаем хранилище от пользователей
-        responseVoid = userController.clearUsers();
+        // Очищаем хранилище
+        ResponseEntity<Void> responseVoid = userController.clearUsers();
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Получаем список пользователей из хранилища после удаления
         responseUsers = userController.findAll();
         assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
         users = responseUsers.getBody();
@@ -208,123 +255,131 @@ public class UserControllerTest {
         assertTrue(users.isEmpty());
     }
 
-    @DisplayName("Добавление/удаление друзей")
+    @DisplayName("Добавление/удаление друзей  и получение общих друзей без вызова исключений")
     @Test
-    void friendAdd() {
+    void shouldAddOrRemoveFriendsWithoutThrowingException() {
         // Добавляем первого пользователя
         ResponseEntity<User> responseUser = userController.create(user1);
-        user1 = responseUser.getBody();
-        assertNotNull(user1);
-
-        // Получаем первого пользователя по id
-        responseUser = userController.findById(user1.getId());
-        user1 = responseUser.getBody();
-        assertNotNull(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
         // Добавляем второго пользователя
         responseUser = userController.create(user2);
-        user2 = responseUser.getBody();
-        assertNotNull(user2);
-
-        // Получаем второго пользователя по id
-        responseUser = userController.findById(user2.getId());
-        user2 = responseUser.getBody();
-        assertNotNull(user2);
-
-        // Добавляем дружбу
-        responseUser = userController.addFriend(user1.getId(), user2.getId());
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-
-        // Получаем список друзей первого пользователя
-        ResponseEntity<Collection<User>> responseFriends = userController.findFriends(user1.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        Collection<User> user1Friends = responseFriends.getBody();
-        assertNotNull(user1Friends);
-        assertFalse(user1Friends.isEmpty());
-        assertTrue(user1Friends.contains(user2));
-
-        // Получаем список друзей второго пользователя
-        responseFriends = userController.findFriends(user2.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        Collection<User> user2Friends = responseFriends.getBody();
-        assertNotNull(user2Friends);
-        assertFalse(user2Friends.isEmpty());
-        assertTrue(user2Friends.contains(user1));
-
-        // Удаляем дружбу
-        ResponseEntity<Void> responseVoid = userController.removeFriend(user2.getId(), user1.getId());
-        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
-
-        // Получаем список друзей первого пользователя после удаления
-        responseFriends = userController.findFriends(user1.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        user1Friends = responseFriends.getBody();
-        assertNotNull(user1Friends);
-        assertTrue(user1Friends.isEmpty());
-
-        // Получаем список друзей второго пользователя после удаления
-        responseFriends = userController.findFriends(user2.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        user2Friends = responseFriends.getBody();
-        assertNotNull(user2Friends);
-        assertTrue(user2Friends.isEmpty());
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
         // Добавляем третьего пользователя
         responseUser = userController.create(user3);
-        user3 = responseUser.getBody();
-        assertNotNull(user3);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
 
-        // Добавляем дружбу первого и третьего
-        responseUser = userController.addFriend(user1.getId(), user3.getId());
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-
-        // Добавляем дружбу второго и третьего
-        responseUser = userController.addFriend(user2.getId(), user3.getId());
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
-
-        // Получаем список общих друзей между первым и вторым
-        responseFriends = userController.findCommonFriends(user1.getId(), user2.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        Collection<User> commonFriends = responseFriends.getBody();
-        assertNotNull(commonFriends);
-        assertFalse(commonFriends.isEmpty());
-        User commonFriend = commonFriends.stream().findFirst().get();
-        assertEquals(user3, commonFriend);
-
-        // Удаляем дружбу второго и третьего
-        responseVoid = userController.removeFriend(user2.getId(), user3.getId());
+        // Добавляем дружбу между первым и вторым пользователями
+        ResponseEntity<Void> responseVoid = userController.addFriend(user1.getId(), user2.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Повторно получаем список общих друзей между первым и вторым
-        responseFriends = userController.findCommonFriends(user1.getId(), user2.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        commonFriends = responseFriends.getBody();
-        assertNotNull(commonFriends);
-        assertTrue(commonFriends.isEmpty());
-
-        // Удаляем дружбу между третьим и первым (в порядке, обратном добавлению)
-        responseVoid = userController.removeFriend(user3.getId(), user1.getId());
+        // Добавляем дружбу между вторым и третьим пользователями
+        responseVoid = userController.addFriend(user2.getId(), user3.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Добавляем дружбу
-        responseUser = userController.addFriend(user1.getId(), user2.getId());
-        assertEquals(HttpStatus.OK, responseUser.getStatusCode());
+        // Получаем список общих друзей между первым и третьим пользователями
+        ResponseEntity<Collection<User>> responseUsers = userController.findCommonFriends(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
+        Collection<User> users = responseUsers.getBody();
+        assertNotNull(users);
+        assertFalse(users.isEmpty());
+        assertFalse(users.contains(user1));
+        assertTrue(users.contains(user2));
+        assertFalse(users.contains(user3));
 
-        // Удаляем второго пользователя
-        responseVoid = userController.deleteUser(user2.getId());
+        // Удаляем дружбу между первым и вторым пользователями
+        responseVoid = userController.removeFriend(user1.getId(), user2.getId());
         assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Получаем удаленного пользователя
-        assertThrows(NotFoundException.class, () -> userController.findById(user2.getId()));
+        // Получаем список общих друзей между первым и третьим пользователями
+        responseUsers = userController.findCommonFriends(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
+        users = responseUsers.getBody();
+        assertNotNull(users);
+        assertTrue(users.isEmpty());
 
-        // Получаем друзей удаленного пользователя
-        assertThrows(NotFoundException.class, () -> userController.findFriends(user2.getId()));
+        // Добавляем дружбу между первым и вторым пользователями
+        responseVoid = userController.addFriend(user1.getId(), user2.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
 
-        // Получаем друзей первого пользователя
-        responseFriends = userController.findFriends(user1.getId());
-        assertEquals(HttpStatus.OK, responseFriends.getStatusCode());
-        user1Friends = responseFriends.getBody();
-        assertNotNull(user1Friends);
-        assertTrue(user1Friends.isEmpty());
+        // Добавляем дружбу между первым и третьим пользователями
+        responseVoid = userController.addFriend(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Получаем список друзей первого пользователя
+        responseUsers = userController.findFriends(user1.getId());
+        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
+        users = responseUsers.getBody();
+        assertNotNull(users);
+        assertFalse(users.isEmpty());
+        assertFalse(users.contains(user1));
+        assertTrue(users.contains(user2));
+        assertTrue(users.contains(user3));
+
+        // Удаляем третьего пользователя
+        responseVoid = userController.deleteUser(user3.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Получаем список друзей первого пользователя
+        responseUsers = userController.findFriends(user1.getId());
+        assertEquals(HttpStatus.OK, responseUsers.getStatusCode());
+        users = responseUsers.getBody();
+        assertNotNull(users);
+        assertFalse(users.isEmpty());
+        assertFalse(users.contains(user1));
+        assertTrue(users.contains(user2));
+        assertFalse(users.contains(user3));
+    }
+
+    @DisplayName("Добавление/удаление друзей с вызовом исключений")
+    @Test
+    void shouldThrowNotFoundOrValidationExceptionWhenAddOrRemoveFriend() {
+        // Добавляем первого пользователя
+        ResponseEntity<User> responseUser = userController.create(user1);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+
+        // Добавляем третьего пользователя
+        responseUser = userController.create(user3);
+        assertEquals(HttpStatus.CREATED, responseUser.getStatusCode());
+
+        // Добавляем дружбу первого пользователя с неизвестным
+        assertThrows(NotFoundException.class, () -> userController.addFriend(user1.getId(), user3.getId() * 100));
+
+        // Добавляем дружбу первого пользователя с отрицательным
+        assertThrows(NotFoundException.class, () -> userController.addFriend(user1.getId(), -1 * user3.getId()));
+
+        // Добавляем дружбу первого пользователя с null
+        assertThrows(ValidationException.class, () -> userController.addFriend(user1.getId(), null));
+
+        // Добавляем дружбу отрицательного пользователя с первым
+        assertThrows(NotFoundException.class, () -> userController.addFriend(-1 * user3.getId(), user1.getId()));
+
+        // Добавляем дружбу неизвестного пользователя с первым
+        assertThrows(NotFoundException.class, () -> userController.addFriend(100 * user3.getId(), user1.getId()));
+
+        // Добавляем дружбу null с первым
+        assertThrows(ValidationException.class, () -> userController.addFriend(null, user1.getId()));
+
+        // Добавляем дружбу первого и третьего пользователей
+        ResponseEntity<Void> responseVoid = userController.addFriend(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Удаляем дружбу первого и третьего пользователей
+        responseVoid = userController.removeFriend(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Повторно удаляем дружбу первого и третьего пользователей
+        responseVoid = userController.removeFriend(user1.getId(), user3.getId());
+        assertEquals(HttpStatus.OK, responseVoid.getStatusCode());
+
+        // Удаляем дружбу отрицательного пользователя и третьего
+        assertThrows(NotFoundException.class, () -> userController.removeFriend(-1 * user3.getId(), user1.getId()));
+
+        // Удаляем дружбу неизвестного пользователя и третьего
+        assertThrows(NotFoundException.class, () -> userController.removeFriend(100 * user3.getId(), user1.getId()));
+
+        // Удаляем дружбу null и третьего
+        assertThrows(ValidationException.class, () -> userController.removeFriend(null, user1.getId()));
     }
 }
