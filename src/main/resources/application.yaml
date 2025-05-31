@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+logging:
+  level:
+    ru:
+      yandex: DEBUG
+    org:
+      springframework:
+        web: WARN
+      zalando:
+        logbook: TRACE
