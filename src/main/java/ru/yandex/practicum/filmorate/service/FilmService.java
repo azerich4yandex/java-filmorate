@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -89,7 +88,7 @@ public class FilmService {
             throw new ValidationException("Значение count должно быть больше нуля");
         }
 
-        Collection<Film> result = findAll().stream().filter(Objects::nonNull).filter(film -> !film.getLikes().isEmpty())
+        Collection<Film> result = findAll().stream().filter(film -> !film.getLikes().isEmpty())
                 .sorted(Comparator.comparing((Film film) -> film.getLikes().size()).reversed()).limit(count).toList();
         log.debug("Получена коллекция топ-фильмов размером {}", result.size());
 

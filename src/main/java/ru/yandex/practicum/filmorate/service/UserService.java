@@ -79,8 +79,9 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
         log.debug("Найден пользователь с  id  {} ", user.getId());
 
-        Collection<User> result = userStorage.findAll().stream().filter(u -> user.getFriends().contains(u.getId()))
-                .toList();
+        Collection<User> result = user.getFriends().stream().map(id -> userStorage.findById(id).orElse(null))
+                .filter(Objects::nonNull).toList();
+        log.debug("Получена коллекция друзей пользователя размером {}", result.size());
 
         log.debug("Возврат результатов на уровень контроллера");
         return result;
