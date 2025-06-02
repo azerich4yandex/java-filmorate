@@ -2,6 +2,7 @@
 
 ![scheme.png](docs/scheme.png)
 
+* Схема БД с использованием [инструмента](https://dbdiagram.io/d/Jajava-filmorate-683dc11961dc3bf08d2ab823)
 * Скрипт развертывания схемы в БД (PostgreSQL v.17) доступен по [ссылке](docs/scheme.sql)
 * Подробное описание таблиц доступно по [ссылке](docs/scheme.sql)
 
