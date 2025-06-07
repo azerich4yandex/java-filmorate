@@ -3,7 +3,8 @@
 ![scheme.png](docs/scheme.png)
 
 * Схема БД с использованием [инструмента](https://dbdiagram.io/d/Jajava-filmorate-683dc11961dc3bf08d2ab823)
-* Скрипт развертывания схемы в БД (PostgreSQL v.16.9) доступен по [ссылке](docs/pgsql_scheme.sql)
+* Скрипт развертывания схемы в БД (`PostgreSQL` v.16.9) доступен по [ссылке](docs/pgsql_scheme.sql)
+* Скрипт развёртывания схемы в БД (`H2`) доступен по [ссылке](docs/h2_scheme.sql)
 * Подробное описание таблиц доступно по [ссылке](docs/scheme.md)
 
 # Примеры запросов к таблицам
@@ -13,105 +14,94 @@
 * Получить список 10 пользователей:
   `UserController.findAll(@RequestParam(defaultValue = "100") int size, @RequestParam(defaultValue = "0") int from)`
   ```sql
-  SELECT u.id,
-         u.email,
-         u.login,
-         u.birthday
+  SELECT u.ID,
+         u.EMAIL,
+         u.LOGIN,
+         u.FULL_NAME,
+         u.BIRTHDAY
     FROM users u
-   LIMIT 10 /* size*/
+   LIMIT 100 /* size*/
   OFFSET 0 /* from */;
   ```
 
 * Получить пользователя по идентификатору : `UserController.findById(@PathVariable Long id)`
   ```sql
-  SELECT u.id,
-         u.email,
-         u.login,
-         u.birthday
-    FROM users u
-   WHERE u.id = 1 /* id */;
+  SELECT u.ID,
+         u.EMAIL,
+         u.LOGIN,
+         u.FULL_NAME,
+         u.BIRTHDAY
+    FROM USERS u
+   WHERE u.ID = 1 /* id */
   ```
 
-* Получить список друзей пользователя: `UserController.findFriends(@PathVariable Long id)`
+* Получить список друзей пользователя: `UserController.findFriends(@PathVariable Long userId)`
   ```sql
-  SELECT u2.id,
-         u2.email,
-         u2.login,
-         u2.birthday
-    FROM users_relationships ur
-   INNER JOIN users u
-      ON ur.user_id = ur.user_id
-   INNER JOIN relationships r
-      ON ur.relationship_id = r.id
-   INNER JOIN relationship_statuses rs
-      ON r.status_id = rs.id
-   INNER JOIN relationship_types rt
-      ON r.type_id = rt.id
-   INNER JOIN users_relationships ur2
-      ON ur2.relationship_id = r.id
-   INNER JOIN users u2
-      ON ur2.user_id = u2.id
-   WHERE ur.user_id = 1 /* id */
-     AND rt.full_name = 'Дружба'
-     AND rs.full_name = 'Одобрено';
+  SELECT u.ID,
+         u.EMAIL,
+         u.LOGIN,
+         u.FULL_NAME,
+         u.BIRTHDAY
+    FROM USERS_RELATIONSHIPS ur
+   INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
+   INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
+   INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+   INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
+   INNER JOIN USERS u ON ur2.USER_ID = u.ID
+   WHERE ur.USER_ID = 1 /* userId */
+     AND rs.FULL_NAME = 'Одобрено'
+     AND rt.FULL_NAME = 'Дружба'
+     AND u.ID != 1; /* userId */
   ```
 
 * Получить список общих друзей пользователей:
-  `UserController.findCommonFriends(@PathVariable Long id, @PathVariable Long otherId)`
+  `UserController.findCommonFriends(@PathVariable Long userId, @PathVariable Long otherId)`
   ```sql
-  WITH first_user_friends
-     AS (SELECT u2.id,
-                u2.email,
-                u2.login,
-                u2.birthday
-           FROM users_relationships ur
-          INNER JOIN users u
-                  ON ur.user_id = ur.user_id
-          INNER JOIN relationships r
-                  ON ur.relationship_id = r.id
-          INNER JOIN relationship_statuses rs
-                  ON r.status_id = rs.id
-          INNER JOIN relationship_types rt
-                  ON r.type_id = rt.id
-          INNER JOIN users_relationships ur2
-                  ON ur2.relationship_id = r.id
-          INNER JOIN users u2
-                  ON ur2.user_id = u2.id
-          WHERE ur.user_id = 1 /* id */
-                AND rt.full_name = 'Дружба'
-                AND rs.full_name = 'Одобрено'),
-  second_user_friends
-     AS (SELECT u2.id,
-                u2.email,
-                u2.login,
-                u2.birthday
-           FROM users_relationships ur
-          INNER JOIN users u
-                  ON ur.user_id = ur.user_id
-          INNER JOIN relationships r
-                  ON ur.relationship_id = r.id
-          INNER JOIN relationship_statuses rs
-                  ON r.status_id = rs.id
-          INNER JOIN relationship_types rt
-                  ON r.type_id = rt.id
-          INNER JOIN users_relationships ur2
-                  ON ur2.relationship_id = r.id
-          INNER JOIN users u2
-                  ON ur2.user_id = u2.id
-          WHERE ur.user_id = 2 /* otherId */
-                AND rt.full_name = 'Дружба'
-                AND rs.full_name = 'Одобрено')
-  SELECT fuf.id,
-         fuf.email,
-         fuf.login,
-         fuf.birthday
+  WITH first_user_friends AS
+  (SELECT u.ID,
+          u.EMAIL,
+          u.LOGIN,
+          u.FULL_NAME,
+          u.BIRTHDAY
+     FROM USERS_RELATIONSHIPS ur
+    INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
+    INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
+    INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+    INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
+    INNER JOIN USERS u ON ur2.USER_ID = u.ID
+    WHERE ur.USER_ID = 1 /* userId */
+      AND rs.FULL_NAME = 'Одобрено'
+      AND rt.FULL_NAME = 'Дружба'
+      AND u.ID != 1 /* userId */ ),
+  second_user_friends AS
+  (SELECT u.ID,
+          u.EMAIL,
+          u.LOGIN,
+          u.FULL_NAME,
+          u.BIRTHDAY
+     FROM USERS_RELATIONSHIPS ur
+    INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
+    INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
+    INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+    INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
+    INNER JOIN USERS u ON ur2.USER_ID = u.ID
+    WHERE ur.USER_ID = 1 /* otherId */
+      AND rs.FULL_NAME = 'Одобрено'
+      AND rt.FULL_NAME = 'Дружба'
+      AND u.ID != 1 /* otherId */ )
+  SELECT fuf.ID,
+         fuf.EMAIL,
+         fuf.LOGIN,
+         fuf.FULL_NAME,
+         fuf.BIRTHDAY
     FROM first_user_friends fuf
-  INTERSECT
-  SELECT suf.id,
-         suf.email,
-         suf.login,
-         suf.birthday
-    FROM second_user_friends suf;
+  EXCEPT
+  SELECT suf.ID,
+         suf.EMAIL,
+         suf.LOGIN,
+         suf.FULL_NAME,
+         suf.BIRTHDAY
+    FROM second_user_friends suf
   ```
 
 * Создание пользователя: `UserController.create(@RequestBody User user)`
