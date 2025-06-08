@@ -44,14 +44,12 @@
          u.BIRTHDAY
     FROM USERS_RELATIONSHIPS ur
    INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-   INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
-   INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+   INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
    INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
    INNER JOIN USERS u ON ur2.USER_ID = u.ID
-   WHERE ur.USER_ID = 1 /* userId */
-     AND rs.FULL_NAME = 'Одобрено'
-     AND rt.FULL_NAME = 'Дружба'
-     AND u.ID != 1; /* userId */
+   WHERE ur.ID = 1 /* userId */
+     AND rat.ID = 4 /* Дружба */
+     AND ur2.USER_ID != ur.ID;
   ```
 
 * Получить список общих друзей пользователей:
@@ -65,14 +63,12 @@
           u.BIRTHDAY
      FROM USERS_RELATIONSHIPS ur
     INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-    INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
-    INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+    INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
     INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
     INNER JOIN USERS u ON ur2.USER_ID = u.ID
-    WHERE ur.USER_ID = 1 /* userId */
-      AND rs.FULL_NAME = 'Одобрено'
-      AND rt.FULL_NAME = 'Дружба'
-      AND u.ID != 1 /* userId */ ),
+    WHERE ur.ID = 1 /* userId */
+      AND rat.ID = 4 /* Дружба */
+      AND ur2.USER_ID != ur.ID),
   second_user_friends AS
   (SELECT u.ID,
           u.EMAIL,
@@ -81,14 +77,12 @@
           u.BIRTHDAY
      FROM USERS_RELATIONSHIPS ur
     INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-    INNER JOIN RELATIONSHIP_STATUSES rs ON r.STATUS_ID = rs.ID
-    INNER JOIN RELATIONSHIP_TYPES rt ON r.TYPE_ID = rt.ID
+    INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
     INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
     INNER JOIN USERS u ON ur2.USER_ID = u.ID
-    WHERE ur.USER_ID = 1 /* otherId */
-      AND rs.FULL_NAME = 'Одобрено'
-      AND rt.FULL_NAME = 'Дружба'
-      AND u.ID != 1 /* otherId */ )
+    WHERE ur.ID = 1 /* otherId */
+     AND rat.ID = 4 /* Дружба */
+     AND ur2.USER_ID != ur.ID)
   SELECT fuf.ID,
          fuf.EMAIL,
          fuf.LOGIN,
@@ -101,7 +95,7 @@
          suf.LOGIN,
          suf.FULL_NAME,
          suf.BIRTHDAY
-    FROM second_user_friends suf
+    FROM second_user_friends suf;
   ```
 
 * Создание пользователя: `UserController.create(@RequestBody User user)`
