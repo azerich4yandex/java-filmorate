@@ -1,6 +1,6 @@
 -- Создание последовательностей
 
-CREATE SEQUENCE IF NOT EXISTS seq_relationship_statuses INCREMENT BY 1 MINVALUE 1
+CREATE SEQUENCE IF NOT EXISTS seq_relationship_attributes INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE IF NOT EXISTS seq_relationship_types INCREMENT BY 1 MINVALUE 1
@@ -31,10 +31,11 @@ CREATE SEQUENCE IF NOT EXISTS seq_users_films INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
 -- Создание таблиц
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS users
+(
   id integer DEFAULT nextval('seq_users') NOT NULL,
-  email varchar(254) NOT NULL,
-  login varchar(254) NOT NULL,
+  email varchar(256) NOT NULL,
+  login varchar(256) NOT NULL,
   full_name text NULL,
   birthday date NOT NULL,
   CONSTRAINT users_pk PRIMARY KEY (id),
@@ -47,41 +48,34 @@ COMMENT ON COLUMN users.email IS 'Адрес электронной почты';
 COMMENT ON COLUMN users.login IS 'Логин';
 COMMENT ON COLUMN users.full_name IS 'Имя';
 
-CREATE TABLE IF NOT EXISTS relationship_types(
-  id integer DEFAULT nextval('seq_relationship_types') NOT NULL,
-  full_name text NOT NULL,
-  CONSTRAINT relationship_types_pk PRIMARY KEY (id),
-  CONSTRAINT relationship_types_unique_full_name UNIQUE (full_name)
+CREATE TABLE IF NOT EXISTS relationship_attributes
+(
+  id integer DEFAULT nextval('seq_relationship_attributes') NOT NULL,
+  attribute_type integer, full_name text NOT NULL,
+  CONSTRAINT relationship_attributes_pk PRIMARY KEY (id),
+  CONSTRAINT relationship_types_unique_attribute_type_full_name UNIQUE (attribute_type, full_name)
 );
-COMMENT ON TABLE relationship_types IS 'Таблица типов отношений';
-COMMENT ON COLUMN relationship_types.id IS 'Идентификатор записи';
-COMMENT ON COLUMN relationship_types.full_name IS 'Наименование';
+COMMENT ON TABLE relationship_attributes IS 'Таблица типов отношений';
+COMMENT ON COLUMN relationship_attributes.id IS 'Идентификатор записи';
+COMMENT ON COLUMN relationship_attributes.attribute_type IS 'Тип атрибута отношений';
+COMMENT ON COLUMN relationship_attributes.full_name IS 'Значение атрибута отношений';
 
-CREATE TABLE IF NOT EXISTS relationship_statuses(
-  id integer DEFAULT nextval('seq_relationship_statuses') NOT NULL,
-  full_name text NOT NULL,
-  CONSTRAINT relationship_statuses_pk PRIMARY KEY (id),
-  CONSTRAINT relationship_statuses_unique_full_name UNIQUE (full_name)
-);
-
-COMMENT ON TABLE relationship_statuses IS 'Таблица статусов отношений';
-COMMENT ON COLUMN relationship_statuses.id IS 'Идентификатор записи';
-COMMENT ON COLUMN relationship_statuses.full_name IS 'Наименование';
-
-CREATE TABLE IF NOT EXISTS relationships (
+CREATE TABLE IF NOT EXISTS relationships
+(
   id integer DEFAULT nextval('seq_relationships') NOT NULL,
   type_id integer NOT NULL,
   status_id integer NOT NULL,
   CONSTRAINT relationships_pk PRIMARY KEY (id),
-  CONSTRAINT relationships_relationship_types_fk FOREIGN KEY (type_id) REFERENCES relationship_types(id),
-  CONSTRAINT relationships_relationship_statuses_fk FOREIGN KEY (status_id) REFERENCES relationship_statuses(id)
+  CONSTRAINT relationships_relationship_relationship_attributes_type_fk FOREIGN KEY (type_id) REFERENCES relationship_attributes(id),
+  CONSTRAINT relationships_relationship_relationship_attributes_status_fk FOREIGN KEY (status_id) REFERENCES relationship_attributes(id)
 );
 COMMENT ON TABLE relationships IS 'Таблица отношений';
 COMMENT ON COLUMN relationships.id IS 'Идентификатор записи';
 COMMENT ON COLUMN relationships.type_id IS 'Идентификатор типа отношений';
 COMMENT ON COLUMN relationships.status_id IS 'Идентификатор статуса отношений';
 
-CREATE TABLE IF NOT EXISTS users_relationships(
+CREATE TABLE IF NOT EXISTS users_relationships
+(
   id integer DEFAULT nextval('seq_users_relationships') NOT NULL,
   user_id integer NOT NULL,
   relationship_id integer NOT NULL,
@@ -95,8 +89,8 @@ COMMENT ON COLUMN users_relationships.id IS 'Идентификатор запи
 COMMENT ON COLUMN users_relationships.user_id IS 'Ссылка на идентификатор пользователя';
 COMMENT ON COLUMN users_relationships.relationship_id IS 'Ссылка на идентификатор отношений';
 
-
-CREATE TABLE IF NOT EXISTS ratings (
+CREATE TABLE IF NOT EXISTS ratings
+(
   id integer DEFAULT nextval('seq_ratings') NOT NULL,
   full_name text NOT NULL,
   CONSTRAINT ratings_pk PRIMARY KEY(id),
@@ -106,11 +100,12 @@ COMMENT ON TABLE ratings IS 'Таблица рейтингов';
 COMMENT ON COLUMN ratings.id IS 'Идентификатор записи';
 COMMENT ON COLUMN ratings.full_name IS 'Наименование';
 
-CREATE TABLE IF NOT EXISTS films (
+CREATE TABLE IF NOT EXISTS films
+(
   id integer DEFAULT nextval('seq_films') NOT NULL,
   full_name text NOT NULL,
   description varchar(200) NOT NULL,
-  release_date DATE, duration integer,
+  release_date DATE,
   duration integer,
   rating_id integer,
   CONSTRAINT films_pk PRIMARY KEY(id),
@@ -125,7 +120,8 @@ COMMENT ON COLUMN films.release_date IS 'Дата релиза';
 COMMENT ON COLUMN films.duration IS 'Длительность';
 COMMENT ON COLUMN films.rating_id IS 'Ссылка на рейтинг';
 
-CREATE TABLE IF NOT EXISTS users_films(
+CREATE TABLE IF NOT EXISTS users_films
+(
   id integer DEFAULT nextval('seq_users_films') NOT NULL,
   user_id integer NOT NULL,
   film_id integer NOT NULL,
@@ -139,7 +135,8 @@ COMMENT ON COLUMN users_films.id IS 'Идентификатор';
 COMMENT ON COLUMN users_films.user_id IS 'Ссылка на идентификатор пользователя';
 COMMENT ON COLUMN users_films.film_id IS 'Ссылка на идентификатор фильма';
 
-CREATE TABLE IF NOT EXISTS genres(
+CREATE TABLE IF NOT EXISTS genres
+(
   id integer DEFAULT nextval('seq_genres') NOT NULL,
   full_name text NOT NULL,
   CONSTRAINT genres_pk PRIMARY KEY(id),
@@ -149,7 +146,8 @@ COMMENT ON TABLE genres IS 'Таблица жанров';
 COMMENT ON COLUMN genres.id IS 'Идентификатор записи';
 COMMENT ON COLUMN genres.full_name IS 'Наименование';
 
-CREATE TABLE IF NOT EXISTS films_genres(
+CREATE TABLE IF NOT EXISTS films_genres
+(
   id integer DEFAULT nextval('seq_films_genres') NOT NULL,
   film_id integer NOT NULL,
   genre_id integer NOT NULL,
@@ -167,68 +165,84 @@ COMMENT ON COLUMN films_genres.genre_id IS 'Ссылка на идентифик
 WITH prepared_data AS
   (SELECT 1 AS id,
           'G' AS full_name
-   UNION SELECT 2 AS id,
-                'PG' AS full_name
-   UNION SELECT 3 AS id,
-                'PG-13' AS full_name
-   UNION SELECT 4 AS id,
-                'R' AS full_name
-   UNION SELECT 5 AS id,
-                'NC-17' AS full_name)
-MERGE INTO ratings AS r USING prepared_data AS pd ON r.id = pd.id WHEN matched THEN
-UPDATE
-SET full_name = pd.full_name WHEN NOT matched THEN
-INSERT (id,
-        full_name)
-VALUES(pd.id, pd.full_name);
+   UNION
+   SELECT 2 AS id,
+          'PG' AS full_name
+   UNION
+   SELECT 3 AS id,
+          'PG-13' AS full_name
+   UNION
+   SELECT 4 AS id,
+          'R' AS full_name
+   UNION
+   SELECT 5 AS id,
+          'NC-17' AS full_name)
+MERGE INTO ratings AS r USING prepared_data AS pd ON r.id = pd.id
+WHEN matched THEN UPDATE SET full_name = pd.full_name
+WHEN NOT matched THEN INSERT (id, full_name) VALUES(pd.id, pd.full_name);
 
 WITH prepared_data AS
   (SELECT 1 AS id,
           'Комедия' AS full_name
-   UNION SELECT 2 AS id,
-                'Драма' AS full_name
-   UNION SELECT 3 AS id,
-                'Мультфильм' AS full_name
-   UNION SELECT 4 AS id,
-                'Триллер' AS full_name
-   UNION SELECT 5 AS id,
-                'Документальный' AS full_name
-   UNION SELECT 6 AS id,
-                'Боевик' AS full_name)
-MERGE INTO genres AS g USING prepared_data AS pd ON g.id = pd.id WHEN matched THEN
-UPDATE
-SET full_name = pd.full_name WHEN NOT matched THEN
-INSERT (id,
-        full_name)
-VALUES(pd.id, pd.full_name);
+   UNION
+   SELECT 2 AS id,
+          'Драма' AS full_name
+   UNION
+   SELECT 3 AS id,
+          'Мультфильм' AS full_name
+   UNION
+   SELECT 4 AS id,
+          'Триллер' AS full_name
+   UNION
+   SELECT 5 AS id,
+          'Документальный' AS full_name
+   UNION
+   SELECT 6 AS id,
+          'Боевик' AS full_name)
+MERGE INTO genres AS g USING prepared_data AS pd ON g.id = pd.id
+WHEN matched THEN UPDATE SET full_name = pd.full_name
+WHEN NOT matched THEN INSERT (id, full_name) VALUES(pd.id, pd.full_name);
 
 WITH prepared_data AS
   (SELECT 1 AS id,
-          'Запрошено' AS full_name
-   UNION SELECT 2 AS id,
-                'Одобрено' AS full_name
-   UNION SELECT 3 AS id,
-                'Отклонено' AS full_name)
-MERGE INTO relationship_statuses AS rs USING prepared_data AS pd ON rs.id = pd.id
-AND rs.full_name = pd.full_name WHEN matched THEN
-UPDATE
-SET full_name = pd.full_name WHEN NOT matched THEN
-INSERT (id,
-        full_name)
-VALUES(pd.id, pd.full_name);
-
-WITH prepared_data AS
-  (SELECT 1 AS id,
-          'Дружба' AS full_name
-   UNION SELECT 2 AS id,
-                'Вражда' AS full_name
-   UNION SELECT 3 AS id,
-                'Семья' AS full_name
-   UNION SELECT 4 AS id,
-                'Любовь' AS full_name)
-MERGE INTO relationship_types AS rt USING prepared_data AS pd ON rt.id = pd.id WHEN matched THEN
-UPDATE
-SET full_name = pd.full_name WHEN NOT matched THEN
-INSERT (id,
-        full_name)
-VALUES(pd.id, pd.full_name);
+	      NULL AS attribute_type,
+	      'Справочники атрибутов' AS full_name
+   UNION
+   SELECT 2 AS id,
+	      1 AS attribute_type,
+	      'Типы отношений' AS full_name
+   UNION
+   SELECT 3 AS id,
+	      1 AS attribute_type,
+	      'Статусы отношений' AS full_name
+   UNION
+   SELECT 4 AS id,
+	      2 AS attribute_type,
+	      'Дружба' AS full_name
+   UNION
+   SELECT 5 AS id,
+	      2 AS attribute_type,
+	      'Вражда' AS full_name
+   UNION
+   SELECT 6 AS id,
+	      2 AS attribute_type,
+	      'Семья' AS full_name
+   UNION
+   SELECT 7 AS id,
+	      2 AS attribute_type,
+	      'Любовь' AS full_name
+   UNION
+   SELECT 8 AS id,
+	      3 AS attribute_type,
+	      'Запрошено' AS full_name
+   UNION
+   SELECT 9 AS id,
+	      3 AS attribute_type,
+	      'Одобрено' AS full_name
+   UNION
+   SELECT 10 AS id,
+	      3 AS attribute_type,
+	      'Отклонено' AS full_name)
+MERGE INTO RELATIONSHIP_ATTRIBUTES AS ra USING prepared_data AS pd ON ra.ID = pd.id AND ra.ATTRIBUTE_TYPE = pd.attribute_type
+WHEN MATCHED THEN UPDATE SET FULL_NAME = pd.full_name
+WHEN NOT MATCHED THEN INSERT (ID, ATTRIBUTE_TYPE, FULL_NAME) VALUES (pd.id, pd.attribute_type, pd.full_name);

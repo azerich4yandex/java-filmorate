@@ -95,7 +95,7 @@
          fuf.FULL_NAME,
          fuf.BIRTHDAY
     FROM first_user_friends fuf
-  EXCEPT
+  INTERSECT
   SELECT suf.ID,
          suf.EMAIL,
          suf.LOGIN,
