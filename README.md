@@ -7,11 +7,11 @@
 * Скрипт развёртывания схемы в БД (`H2`) доступен по [ссылке](docs/h2_scheme.sql)
 * Подробное описание таблиц доступно по [ссылке](docs/scheme.md)
 
-# Примеры запросов к таблицам
+# Примеры запросов к таблицам (справедливо для `H2`)
 
 ## Пользователи
 
-* Получить список 10 пользователей:
+* Получить список 100 пользователей:
   `UserController.findAll(@RequestParam(defaultValue = "100") int size, @RequestParam(defaultValue = "0") int from)`
   ```sql
   SELECT u.ID,
@@ -21,7 +21,7 @@
          u.BIRTHDAY
     FROM users u
    LIMIT 100 /* size*/
-  OFFSET 0 /* from */;
+  OFFSET 0 /* from */
   ```
 
 * Получить пользователя по идентификатору : `UserController.findById(@PathVariable Long id)`
@@ -42,191 +42,167 @@
          u.LOGIN,
          u.FULL_NAME,
          u.BIRTHDAY
-    FROM USERS_RELATIONSHIPS ur
-   INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-   INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
-   INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
-   INNER JOIN USERS u ON ur2.USER_ID = u.ID
-   WHERE ur.ID = 1 /* userId */
-     AND rat.ID = 4 /* Дружба */
-     AND ur2.USER_ID != ur.ID;
+    FROM FRIENDS f
+   INNER JOIN USERS u ON f.OTHER_ID = u.ID
+   WHERE f.USER_ID = 1 /* userId */
   ```
 
 * Получить список общих друзей пользователей:
   `UserController.findCommonFriends(@PathVariable Long userId, @PathVariable Long otherId)`
   ```sql
-  WITH first_user_friends AS
-  (SELECT u.ID,
-          u.EMAIL,
-          u.LOGIN,
-          u.FULL_NAME,
-          u.BIRTHDAY
-     FROM USERS_RELATIONSHIPS ur
-    INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-    INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
-    INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
-    INNER JOIN USERS u ON ur2.USER_ID = u.ID
-    WHERE ur.ID = 1 /* userId */
-      AND rat.ID = 4 /* Дружба */
-      AND ur2.USER_ID != ur.ID),
-  second_user_friends AS
-  (SELECT u.ID,
-          u.EMAIL,
-          u.LOGIN,
-          u.FULL_NAME,
-          u.BIRTHDAY
-     FROM USERS_RELATIONSHIPS ur
-    INNER JOIN RELATIONSHIPS r ON ur.RELATIONSHIP_ID = r.ID
-    INNER JOIN RELATIONSHIP_ATTRIBUTES rat ON r.TYPE_ID = rat.ID
-    INNER JOIN USERS_RELATIONSHIPS ur2 ON r.ID = ur2.RELATIONSHIP_ID
-    INNER JOIN USERS u ON ur2.USER_ID = u.ID
-    WHERE ur.ID = 1 /* otherId */
-     AND rat.ID = 4 /* Дружба */
-     AND ur2.USER_ID != ur.ID)
-  SELECT fuf.ID,
-         fuf.EMAIL,
-         fuf.LOGIN,
-         fuf.FULL_NAME,
-         fuf.BIRTHDAY
-    FROM first_user_friends fuf
+  SELECT u.ID,
+         u.EMAIL,
+         u.LOGIN,
+         u.FULL_NAME,
+         u.BIRTHDAY
+    FROM FRIENDS f
+  INNER JOIN USERS u ON f.OTHER_ID = u.ID
+  WHERE f.USER_ID = 1 /* user_id */
   INTERSECT
-  SELECT suf.ID,
-         suf.EMAIL,
-         suf.LOGIN,
-         suf.FULL_NAME,
-         suf.BIRTHDAY
-    FROM second_user_friends suf;
+  SELECT u.ID,
+         u.EMAIL,
+         u.LOGIN,
+         u.FULL_NAME,
+         u.BIRTHDAY
+    FROM FRIENDS f
+   INNER JOIN USERS u ON f.OTHER_ID = u.ID
+   WHERE f.USER_ID = 1 /* otherId */
   ```
 
 * Создание пользователя: `UserController.create(@RequestBody User user)`
   ```sql
-  INSERT INTO users (email, login, full_name, birthday)
-  VALUES ('a@a.ru', 'a', NULL, to_date('01.01.2000', 'dd.mm.yyyy')) RETURNING id;
+  INSERT INTO USERS (EMAIL, LOGIN, FULL_NAME, BIRTHDAY)
+  VALUES ('a@a.ru', 'a', NULL, to_date('01.01.2000', 'dd.mm.yyyy'))
   ```
 
 * Обновление пользователя: `UserController.update(@RequestBody User newUser)`
   ```sql
-  UPDATE users
-     SET email = 'a@b.ru',
-         login = 'aa',
-         full_name = 'Aa',
-         birthday = TO_DATE('02.01.2000', 'dd.mm.yyyy')
-   WHERE id = 1 /* id */;
+  UPDATE USERS
+     SET EMAIL = 'a@b.ru', -- newUser.getEmail()
+         LOGIN = 'aa', -- newUser.getLogin()
+         FULL_NAME = 'Aa', -- newUser.getName()
+         BIRTHDAY = TO_DATE('02.01.2000', 'dd.mm.yyyy') -- newUser.getBirthday()
+   WHERE ID = 1 /* newUser.getId() */
   ```
 
-* Добавление дружбы: `UserController.addFriend(@PathVariable Long id, @PathVariable Long friendId)`
+* Добавление дружбы: `UserController.addFriend(@PathVariable Long userId, @PathVariable Long friendId)`
+  ```sql
+  INSERT INTO FRIENDS (USER_ID, OTHER_ID)
+  VALUES (1 /* userId */, 2 /* friendId*/)
+  ```
 
-Примечание: Бизнес-логика по проверке наличия запросов от одного пользователя другому, а так же изменение статуса дружбы
-будет реализована на уровне приложения. Так же на уровне приложения в ходе работы алгоритмов будет получен идентификатор
-общих отношений с типом `Дружба` и созданы/изменены необходимые записи в таблицах `relationships` и
-`users_relationships` для обоих пользователей
-
-* Удаление дружбы: `UserController.removeFriend(@PathVariable Long id, @PathVariable Long friendId)`
-
-Примечание: Бизнес-логика по проверке наличия дружбы между пользователями, а так же изменение статуса дружбы будет
-реализовано на уровне приложения. Так же на уровне приложения в ходе работы алгоритмов будет получен идентификатор общих
-отношений с типом `Дружба` и при его наличии будут удалены/изменены необходимые записи в таблицах `relationships` и
-`users_relationships` для обоих пользователей
+* Удаление дружбы: `UserController.removeFriend(@PathVariable Long userId, @PathVariable Long friendId)`
+  ```sql
+  DELETE FROM FRIENDS
+   WHERE USER_ID = 1 /* userId*/
+     AND OTHER_ID = 2 /* friendId */ 
+  ```
 
 * Удаление пользователя по идентификатору: `UserController.deleteUser(@PathVariable Long id)`
   ```sql
   DELETE FROM users
-   WHERE id = 1 /* id */;
+   WHERE id = 1 /* id */
   ```
 
 * Очистка таблицы пользователей: `UserController.clearUsers()`
   ```sql
-  DELETE FROM users;
+  DELETE FROM users
   ```
 
 ## Фильмы
 
-* Получить список 10 фильмов:
+* Получить список первых 100 фильмов:
   `FilmController.findAll(@RequestParam(name = "size", defaultValue = "100") int size, @RequestParam(name = "from", defaultValue = "0") int from)`
   ```sql
-  SELECT fi.id,
-         fi.full_name,
-         fi.description,
-         fi.duration,
-         fi.release_date,
-         r.full_name AS rating_name
-    FROM films fi
-    LEFT JOIN ratings r
-      ON fi.rating_id = r.id
+  SELECT f.ID,
+         f.FULL_NAME,
+         f.DESCRIPTION,
+         f.DURATION,
+         f.RELEASE_DATE,
+         f.RATING_ID,
+         r.FULL_NAME AS rating_name
+    FROM FILMS f
+    LEFT JOIN RATINGS r
+      ON f.RATING_ID = r.ID
+   ORDER BY 1
    LIMIT 100 /* size */
-  OFFSET 0 /* from */;
+  OFFSET 0 /* from */
   ```
 
 * Получить фильм по идентификатору: `FilmController.findById(@PathVariable Long id)`
   ```sql
-  SELECT fi.id,
-         fi.full_name,
-         fi.description,
-         fi.duration,
-         fi.release_date,
-         r.full_name AS rating_name
-    FROM films fi
-    LEFT JOIN ratings r
-      ON fi.rating_id = r.id
-   WHERE fi.id = 1 /* id */;
+  SELECT f.ID,
+         f.FULL_NAME,
+         f.DESCRIPTION,
+         f.DURATION,
+         f.RELEASE_DATE,
+         f.RATING_ID,
+         r.FULL_NAME AS rating_name
+    FROM FILMS f
+    LEFT JOIN RATINGS r
+      ON f.RATING_ID = r.ID
+   WHERE f.ID = 1 /* id */;
   ```
 
 * Получить список самых популярных фильмов:
   `FilmController.findPopular(@RequestParam(required = false, defaultValue = "10") Integer count)`
   ```sql
-  SELECT fi.id,
-         fi.full_name,
-         fi.description,
-         fi.duration,
-         fi.release_date,
-         r.full_name  AS rating_name,
-         COUNT(uf.id) AS total_likes
-    FROM films fi
-    LEFT JOIN ratings r
-      ON fi.rating_id = r.id
-   INNER JOIN users_films uf
-      ON fi.id = uf.film_id
-   GROUP BY fi.id,
-            fi.full_name,
-            fi.description,
-            fi.duration,
-            fi.release_date,
-            r.full_name
-   ORDER BY 7 DESC
-   LIMIT 10 /* count */;
+  SELECT f.ID,
+         f.FULL_NAME,
+         f.DESCRIPTION,
+         f.DURATION,
+         f.RELEASE_DATE,
+         f.RATING_ID,
+         r.FULL_NAME AS rating_name,
+         COUNT(uf.ID)
+    FROM FILMS f
+    LEFT JOIN RATINGS r
+      ON f.RATING_ID = r.ID
+   INNER JOIN USERS_FILMS uf
+      ON f.ID = uf.FILM_ID
+   GROUP BY f.ID,
+         f.FULL_NAME,
+         f.DESCRIPTION,
+         f.DURATION,
+         f.RELEASE_DATE,
+         f.RATING_ID,
+         r.FULL_NAME
+   ORDER BY 8
+   LIMIT 10 /* count */
   ```
 
 * Добавление фильма: `FilmController.create(@RequestBody Film film)`
   ```sql
-  INSERT INTO films (full_name, description)
-  VALUES ('А', 'Остросюжетный фильм про приключения А') RETURNING id;
+  INSERT INTO FILMS (FULL_NAME, DESCRIPTION)
+  VALUES ('А', 'Остросюжетный фильм про приключения А')
   ```
 
 * Обновление фильма: `FilmController.update(@RequestBody Film film)`
   ```sql
-  UPDATE films
-     SET full_name = 'Б',
-         description = 'Не очень интересный фильм про Б'
-   WHERE id = 1 /* id */;
+  UPDATE FILMS
+     SET FULL_NAME = 'Б',
+         DESCRIPTION = 'Не очень интересный фильм про Б'
+   WHERE ID = 1 /* id */
   ```
 
 * Добавление лайка фильму: `FilmController.addLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId)`
-
-Примечание: Бизнес-логика по проверке наличия лайков пользователя фильму, а так же добавление лайка при его отсутствии
-будет реализована на уровне приложения. Так же на уровне приложения в ходе работы будут созданы/проигнорированы
-необходимые записи в таблице `users_films`
+  ```sql
+  INSERT INTO USERS_FILMS (FILM_ID, USER_ID)
+  VALUES (1 /* filmId*/, 1 /* userId*/)
+  ```
 
 * Удаление лайка с фильма:
   `FilmController.removeLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId)`
-
-Примечание: Бизнес-логика по проверке наличия лайков пользователя фильму, а так же удаление лайка при его наличии
-будет реализована на уровне приложения. Так же на уровне приложения в ходе работы будут удалены
-необходимые записи в таблице `users_films`
+  ```sql
+  DELETE FROM USERS_FILMS
+   WHERE FILM_ID = 1 /* filmId*/
+     AND USER_ID = 1 /* userId*/
+  ```
 
 * Удаление фильма по идентификатору: `FilmController.deleteFilm(@PathVariable(name = "id") Long filmId)`
   ```sql
   DELETE FROM films
-   WHERE id = 1 /* id */;
+   WHERE id = 1 /* filmId */;
   ```
 
 * Очистка таблицы пользователей: `FilmController.clearFilms()`

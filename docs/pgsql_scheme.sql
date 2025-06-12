@@ -1,14 +1,4 @@
 -- Создание последовательностей
-
-CREATE SEQUENCE IF NOT EXISTS seq_relationship_attributes INCREMENT BY 1 MINVALUE 1
-START 1 CACHE 1 NO CYCLE;
-
-CREATE SEQUENCE IF NOT EXISTS seq_relationship_types INCREMENT BY 1 MINVALUE 1
-START 1 CACHE 1 NO CYCLE;
-
-CREATE SEQUENCE IF NOT EXISTS seq_users_relationships INCREMENT BY 1 MINVALUE 1
-START 1 CACHE 1 NO CYCLE;
-
 CREATE SEQUENCE IF NOT EXISTS seq_films_genres INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
@@ -18,9 +8,6 @@ START 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE IF NOT EXISTS seq_users INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
-CREATE SEQUENCE IF NOT EXISTS seq_relationships INCREMENT BY 1 MINVALUE 1
-START 1 CACHE 1 NO CYCLE;
-
 CREATE SEQUENCE IF NOT EXISTS seq_ratings INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
@@ -28,6 +15,9 @@ CREATE SEQUENCE IF NOT EXISTS seq_films INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE IF NOT EXISTS seq_users_films INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE IF NOT EXISTS seq_friends INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
 -- Создание таблиц
@@ -47,47 +37,6 @@ COMMENT ON COLUMN users.id IS 'Идентификатор записи';
 COMMENT ON COLUMN users.email IS 'Адрес электронной почты';
 COMMENT ON COLUMN users.login IS 'Логин';
 COMMENT ON COLUMN users.full_name IS 'Имя';
-
-CREATE TABLE IF NOT EXISTS relationship_attributes
-(
-  id integer DEFAULT nextval('seq_relationship_attributes') NOT NULL,
-  attribute_type integer, full_name text NOT NULL,
-  CONSTRAINT relationship_attributes_pk PRIMARY KEY (id),
-  CONSTRAINT relationship_types_unique_attribute_type_full_name UNIQUE (attribute_type, full_name)
-);
-COMMENT ON TABLE relationship_attributes IS 'Таблица типов отношений';
-COMMENT ON COLUMN relationship_attributes.id IS 'Идентификатор записи';
-COMMENT ON COLUMN relationship_attributes.attribute_type IS 'Тип атрибута отношений';
-COMMENT ON COLUMN relationship_attributes.full_name IS 'Значение атрибута отношений';
-
-CREATE TABLE IF NOT EXISTS relationships
-(
-  id integer DEFAULT nextval('seq_relationships') NOT NULL,
-  type_id integer NOT NULL,
-  status_id integer NOT NULL,
-  CONSTRAINT relationships_pk PRIMARY KEY (id),
-  CONSTRAINT relationships_relationship_relationship_attributes_type_fk FOREIGN KEY (type_id) REFERENCES relationship_attributes(id),
-  CONSTRAINT relationships_relationship_relationship_attributes_status_fk FOREIGN KEY (status_id) REFERENCES relationship_attributes(id)
-);
-COMMENT ON TABLE relationships IS 'Таблица отношений';
-COMMENT ON COLUMN relationships.id IS 'Идентификатор записи';
-COMMENT ON COLUMN relationships.type_id IS 'Идентификатор типа отношений';
-COMMENT ON COLUMN relationships.status_id IS 'Идентификатор статуса отношений';
-
-CREATE TABLE IF NOT EXISTS users_relationships
-(
-  id integer DEFAULT nextval('seq_users_relationships') NOT NULL,
-  user_id integer NOT NULL,
-  relationship_id integer NOT NULL,
-  CONSTRAINT users_relationships_pk PRIMARY KEY (id),
-  CONSTRAINT users_relationships_users_fk FOREIGN KEY (user_id) REFERENCES users(id),
-  CONSTRAINT users_relationships_relationships_fk FOREIGN KEY (relationship_id) REFERENCES relationships(id),
-  CONSTRAINT users_relationships_unique_user_id_relationship_id UNIQUE (user_id, relationship_id)
-);
-COMMENT ON TABLE users_relationships IS 'Таблица связей пользователей и отношений';
-COMMENT ON COLUMN users_relationships.id IS 'Идентификатор записи';
-COMMENT ON COLUMN users_relationships.user_id IS 'Ссылка на идентификатор пользователя';
-COMMENT ON COLUMN users_relationships.relationship_id IS 'Ссылка на идентификатор отношений';
 
 CREATE TABLE IF NOT EXISTS ratings
 (
@@ -134,6 +83,21 @@ COMMENT ON TABLE users_films IS 'Таблица связей пользоват�
 COMMENT ON COLUMN users_films.id IS 'Идентификатор';
 COMMENT ON COLUMN users_films.user_id IS 'Ссылка на идентификатор пользователя';
 COMMENT ON COLUMN users_films.film_id IS 'Ссылка на идентификатор фильма';
+
+CREATE TABLE IF NOT EXISTS friends
+(
+  id integer DEFAULT nextval('seq_friends') NOT NULL,
+  user_id integer NOT NULL,
+  other_id integer NOT NULL,
+  CONSTRAINT friends_pk PRIMARY KEY (id),
+  CONSTRAINT friends_unique_user_id_other_id UNIQUE (other_id, user_id),
+  CONSTRAINT friends_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users(id),
+  CONSTRAINT friends_users_other_id_fk FOREIGN KEY (other_id) REFERENCES users(id)
+);
+COMMENT ON TABLE friends IS 'Таблица связей пользователей';
+COMMENT ON COLUMN friends.id IS 'Идентификатор записи';
+COMMENT ON COLUMN friends.user_id IS 'Идентификатор пользователя-заявителя';
+COMMENT ON COLUMN friends.other_id IS 'Идентификатор пользователя-адресата';
 
 CREATE TABLE IF NOT EXISTS genres
 (
@@ -202,47 +166,3 @@ WITH prepared_data AS
 MERGE INTO genres AS g USING prepared_data AS pd ON g.id = pd.id
 WHEN matched THEN UPDATE SET full_name = pd.full_name
 WHEN NOT matched THEN INSERT (id, full_name) VALUES(pd.id, pd.full_name);
-
-WITH prepared_data AS
-  (SELECT 1 AS id,
-	      NULL AS attribute_type,
-	      'Справочники атрибутов' AS full_name
-   UNION
-   SELECT 2 AS id,
-	      1 AS attribute_type,
-	      'Типы отношений' AS full_name
-   UNION
-   SELECT 3 AS id,
-	      1 AS attribute_type,
-	      'Статусы отношений' AS full_name
-   UNION
-   SELECT 4 AS id,
-	      2 AS attribute_type,
-	      'Дружба' AS full_name
-   UNION
-   SELECT 5 AS id,
-	      2 AS attribute_type,
-	      'Вражда' AS full_name
-   UNION
-   SELECT 6 AS id,
-	      2 AS attribute_type,
-	      'Семья' AS full_name
-   UNION
-   SELECT 7 AS id,
-	      2 AS attribute_type,
-	      'Любовь' AS full_name
-   UNION
-   SELECT 8 AS id,
-	      3 AS attribute_type,
-	      'Запрошено' AS full_name
-   UNION
-   SELECT 9 AS id,
-	      3 AS attribute_type,
-	      'Одобрено' AS full_name
-   UNION
-   SELECT 10 AS id,
-	      3 AS attribute_type,
-	      'Отклонено' AS full_name)
-MERGE INTO RELATIONSHIP_ATTRIBUTES AS ra USING prepared_data AS pd ON ra.ID = pd.id AND ra.ATTRIBUTE_TYPE = pd.attribute_type
-WHEN MATCHED THEN UPDATE SET FULL_NAME = pd.full_name
-WHEN NOT MATCHED THEN INSERT (ID, ATTRIBUTE_TYPE, FULL_NAME) VALUES (pd.id, pd.attribute_type, pd.full_name);
