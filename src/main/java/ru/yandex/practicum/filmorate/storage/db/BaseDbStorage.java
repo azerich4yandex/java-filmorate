@@ -48,7 +48,7 @@ public class BaseDbStorage<T> {
         Collection<T> result = jdbcTemplate.query(connection -> {
             PreparedStatement ps = connection.prepareStatement(query);
             for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx+1, params[idx]);
+                ps.setObject(idx + 1, params[idx]);
             }
 
             return ps;
