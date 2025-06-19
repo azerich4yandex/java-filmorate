@@ -1,12 +1,14 @@
 logging:
   level:
     ru:
-      yandex: DEBUG
+      yandex: WARN
     org:
       springframework:
+        jdbc:
+          core: WARN
         web: WARN
       zalando:
-        logbook: TRACE
+        logbook: WARN
 server:
   port: 8080
 spring:

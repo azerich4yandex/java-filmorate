@@ -4,56 +4,116 @@ import jakarta.validation.ValidationException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.GenreStorage;
+import ru.yandex.practicum.filmorate.storage.MpaStorage;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
+import ru.yandex.practicum.filmorate.storage.db.dto.create.NewFilmRequest;
+import ru.yandex.practicum.filmorate.storage.db.dto.read.FilmDto;
+import ru.yandex.practicum.filmorate.storage.db.dto.read.GenreDto;
+import ru.yandex.practicum.filmorate.storage.db.dto.read.UserShortDto;
+import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateFilmRequest;
+import ru.yandex.practicum.filmorate.storage.db.mappers.FilmMapper;
+import ru.yandex.practicum.filmorate.storage.db.mappers.GenreMapper;
+import ru.yandex.practicum.filmorate.storage.db.mappers.UserMapper;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FilmService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final FilmStorage filmStorage;
     private final UserStorage userStorage;
-
-    @Autowired
-    public FilmService(FilmStorage filmStorage, UserStorage userStorage) {
-        this.filmStorage = filmStorage;
-        this.userStorage = userStorage;
-    }
+    private final MpaStorage mpaStorage;
+    private final GenreStorage genreStorage;
 
     /**
-     * Метод возвращает коллекцию {@link Film}
+     * Метод возвращает коллекцию {@link FilmDto}
      *
-     * @return коллекция {@link Film}
+     * @param size максимальный размер коллекции
+     * @param from номер стартового элемента
+     * @return результирующая коллекция
      */
-    public Collection<Film> findAll() {
+    public Collection<FilmDto> findAll(Integer size, Integer from) {
         log.debug("Запрос всех фильмов на уровне сервиса");
+        log.debug("Размер коллекции: {}", size);
+        log.debug("Номер стартового элемента: {}", from);
 
-        Collection<Film> result = filmStorage.findAll();
-        log.debug("На уровень сервиса вернулась коллекция размером {}", result.size());
+        Collection<Film> searchResult = filmStorage.findAll(size, from);
+        log.debug("На уровень сервиса вернулась коллекция размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция преобразована. Размер коллекции после преобразования: {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень контроллера");
         return result;
     }
 
     /**
-     * Метод возвращает экземпляр класса {@link Film}, найденный по идентификатору
+     * Метод получает список из {@link FilmDto} на основе размера коллекции {@link FilmDto#getLikes()}
+     *
+     * @param count размер возвращаемой коллекции
+     * @return результирующая коллекция
+     * @throws ValidationException если передано пустой размер возвращаемой коллекции
+     */
+    public Collection<FilmDto> findPopular(Integer count) throws ValidationException {
+        log.debug("Поиск топ фильмов на уровне сервиса");
+
+        // Если аннотация в параметре контроллера была проигнорирована (запуск тестов напрямую без Mock)
+        count = count == null ? 10 : count;
+
+        // Если передано отрицательное значение
+        if (count <= 0) {
+            throw new ValidationException("Значение count должно быть больше нуля");
+        }
+
+        Collection<Film> searchResult = filmStorage.findPopular(count);
+        log.debug("Получена коллекция топ-фильмов размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция топ-фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
+
+        log.debug("Возврат коллекции топ-фильмов на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает экземпляр класса {@link FilmDto}, найденный по идентификатору
      *
      * @param filmId идентификатор фильма
-     * @return экземпляр класса {@link Film}
+     * @return экземпляр класса {@link FilmDto}
      * @throws ValidationException если передан пустой filmId
+     * @throws NotFoundException если экземпляр не найден
      */
-    public Film findById(Long filmId) throws ValidationException {
+    public FilmDto findById(Long filmId) throws ValidationException, NotFoundException {
         log.debug("Поиск фильма по id на уровне сервиса");
 
         if (filmId == null) {
@@ -61,163 +121,97 @@ public class FilmService {
         }
         log.debug("Передан id фильма: {}", filmId);
 
-        Film film = filmStorage.findById(filmId)
+        Film searchResult = filmStorage.findById(filmId)
                 .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден"));
-        log.debug("Фильм с id {} найден в хранилище", film.getId());
+        log.debug("Фильм с id {} найден в хранилище", searchResult.getId());
+
+        FilmDto result = FilmMapper.mapToFilmDto(searchResult);
+
+        // Заполняем коллекции
+        completeDto(result);
+        log.debug("Найденный фильм с id {} преобразован", result.getId());
 
         log.debug("Возврат результата поиска на уровень контроллера");
-        return film;
-    }
-
-    /**
-     * Метод получает список из {@link Film} на основе размера коллекции {@link Film#getLikes()}
-     *
-     * @param count размер возвращаемой коллекции
-     * @return результирующая коллекция
-     */
-    public Collection<Film> findPopular(Integer count) {
-        log.debug("Поиск топ фильмов на уровне сервиса");
-
-        // Если аннотация в параметре контроллера была проигнорирована (запуск тестов напрямую без Mock)
-        if (count == null) {
-            count = 10;
-        }
-
-        // Если передано отрицательное значение
-        if (count <= 0) {
-            throw new ValidationException("Значение count должно быть больше нуля");
-        }
-
-        Collection<Film> result = findAll().stream().filter(film -> !film.getLikes().isEmpty())
-                .sorted(Comparator.comparing((Film film) -> film.getLikes().size()).reversed()).limit(count).toList();
-        log.debug("Получена коллекция топ-фильмов размером {}", result.size());
-
-        log.debug("Возврат коллекции топ-фильмов на уровень контроллера");
         return result;
     }
 
     /**
-     * Метод проверяет полученную модель {@link Film} и передает для сохранения на уровень хранилища, после чего
-     * сохранённую модель возвращает на уровень контроллера
+     * Метод проверяет полученную модель и передает для сохранения на уровень хранилища, после чего сохранённую модель
+     * возвращает на уровень контроллера
      *
-     * @param film несохраненный экземпляр {@link Film}
-     * @return сохраненный экземпляр {@link Film}
+     * @param request несохраненный экземпляр {@link NewFilmRequest}
+     * @return сохраненный экземпляр {@link FilmDto}
+     * @throws ValidationException в случае ошибок валидации
      */
-    public Film create(Film film) {
+    public FilmDto create(NewFilmRequest request) throws ValidationException {
         log.debug("Создание фильма на уровне сервиса");
+
+        Film film = FilmMapper.mapToFilm(request);
+        log.debug("Переданная модель преобразована");
 
         log.debug("Валидация переданной модели");
         validate(film);
         log.debug("Валидация модели завершена");
 
-        film = filmStorage.create(film);
+        film = filmStorage.createFilm(film);
+
+        FilmDto result = FilmMapper.mapToFilmDto(film);
+
+        completeDto(result);
+        log.debug("Сохранённая модель преобразована");
 
         log.debug("Возврат результата добавления на уровень контроллера");
-        return film;
+        return result;
     }
 
     /**
-     * Метод проверяет полученную модель {@link Film} и передает для обновления на уровень хранилища, после чего
-     * сохранённую модель возвращает на уровень контроллера
+     * Метод проверяет полученную модель и передает для обновления на уровень хранилища, после чего сохранённую модель
+     * возвращает на уровень контроллера
      *
-     * @param newFilm несохраненный экземпляр класса {@link Film}
-     * @return сохраненный экземпляр класса {@link Film}
+     * @param request несохраненный экземпляр класса {@link UpdateFilmRequest}
+     * @return сохраненный экземпляр класса {@link FilmDto}
      * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если фильм для обновления не найден
      */
-    public Film update(Film newFilm) throws ValidationException {
+    public FilmDto update(UpdateFilmRequest request) throws ValidationException, NotFoundException {
         log.debug("Обновление фильма на уровне сервиса");
 
-        if (newFilm.getId() == null) {
+        if (request.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
 
-        log.debug("Валидация полученной модели");
-        validate(newFilm);
-        log.debug("Валидация модели  завершена");
-
-        Film existingFilm = filmStorage.findById(newFilm.getId())
-                .orElseThrow(() -> new NotFoundException("Фильм с id " + newFilm.getId() + " не найден"));
+        Film existingFilm = filmStorage.findById(request.getId())
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + request.getId() + " не найден"));
         log.debug("Фильм с id {} найден в хранилище для обновления", existingFilm.getId());
-        boolean valuesAreChanged = false;
 
-        // Проверим изменение названия
-        if (!newFilm.getName().equals(existingFilm.getName())) {
-            log.debug("Будет изменено название фильма с {} на {}", existingFilm.getName(), newFilm.getName());
-            existingFilm.setName(newFilm.getName());
-            valuesAreChanged = true;
-        }
+        Film updatedFilm = FilmMapper.updateFilmFields(existingFilm, request);
 
-        // Проверим изменение описания
-        if (!newFilm.getDescription().equals(existingFilm.getDescription())) {
-            log.debug("Будет изменено описание фильма с {} на {}", existingFilm.getDescription(),
-                    newFilm.getDescription());
-            existingFilm.setDescription(newFilm.getDescription());
-            valuesAreChanged = true;
-        }
+        log.debug("Валидация обновлённой модели");
+        validate(updatedFilm);
+        log.debug("Валидация обновлённой модели завершена");
 
-        // Проверим изменение даты релиза
-        if (newFilm.getReleaseDate() != null) {
-            if (!newFilm.getReleaseDate().equals(existingFilm.getReleaseDate())) {
-                log.debug("Будет изменена дата релиза фильма с {} на {}",
-                        existingFilm.getReleaseDate().format(DATE_FORMATTER),
-                        newFilm.getReleaseDate().format(DATE_FORMATTER));
+        // Сохраняем изменения
+        filmStorage.updateFilm(updatedFilm);
 
-                existingFilm.setReleaseDate(newFilm.getReleaseDate());
+        FilmDto result = FilmMapper.mapToFilmDto(updatedFilm);
 
-                valuesAreChanged = true;
-            }
-        } else {
-            log.debug("Будет удалена дата релиза");
-
-            existingFilm.setReleaseDate(null);
-
-            valuesAreChanged = true;
-        }
-
-        // Проверим изменение длительности
-        if (newFilm.getDuration() != null) {
-            if (!newFilm.getDuration().equals(existingFilm.getDuration())) {
-                log.debug("Будет изменена длительность фильма с {} на {}", existingFilm.getDuration(),
-                        newFilm.getDuration());
-
-                existingFilm.setDuration(newFilm.getDuration());
-
-                valuesAreChanged = true;
-            }
-        } else if (existingFilm.getDuration() != null) {
-            log.debug("Будет удалена продолжительность");
-
-            existingFilm.setDuration(null);
-
-            valuesAreChanged = true;
-        }
-
-        // Если изменения данных были
-        if (valuesAreChanged) {
-            // Проводим валидацию
-            log.debug("Валидация обновлённой модели");
-            validate(existingFilm);
-            log.debug("Валидация обновлённой модели завершена");
-
-            // Сохраняем изменения
-            filmStorage.update(existingFilm);
-        } else {
-            log.info("Изменения не обнаружены");
-        }
+        // Заполняем коллекции
+        completeDto(result);
+        log.debug("Обновленная модель преобразована");
 
         log.debug("Возврат результата обновления на уровень контроллера");
-        return existingFilm;
+        return result;
     }
 
     /**
-     * Метод добавляет фильм в коллекцию понравившихся пользователю фильмов и пользователя в коллекцию почитателей
-     * фильма
+     * Метод добавляет лайк пользователя в коллекцию лайков фильма
      *
      * @param filmId идентификатор фильма
      * @param userId идентификатор пользователя
-     * @throws RuntimeException при неожиданной ошибке
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если фильм или пользователь не найдены
      */
-    public void addLike(Long filmId, Long userId) throws RuntimeException {
+    public void addLike(Long filmId, Long userId) throws ValidationException, NotFoundException {
         log.debug("Добавление лайка фильму на уровне сервиса");
 
         if (filmId == null) {
@@ -238,15 +232,20 @@ public class FilmService {
 
         // Добавляем пользователя в коллекцию пользователей, которым фильм понравился
         log.debug("Добавляем пользователя с id {} в коллекцию любителей фильма с id {}", user.getId(), film.getId());
-        film.getLikes().add(user.getId());
-
-        // Сохраняем изменения фильма в хранилище
-        filmStorage.save(film);
+        filmStorage.addLike(film.getId(), user.getId());
 
         log.debug("Возврат результата добавления лайка на уровень контроллера");
     }
 
-    public void removeLike(Long filmId, Long userId) {
+    /**
+     * Метод удаляет лайк пользователя из коллекции лайков фильма
+     *
+     * @param filmId идентификатор фильма
+     * @param userId идентификатор пользователя
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если не найдены фильм или пользователь
+     */
+    public void removeLike(Long filmId, Long userId) throws ValidationException, NotFoundException {
         log.debug("Удаление лайка, поставленного фильму");
 
         // Получаем фильм из хранилища
@@ -269,15 +268,18 @@ public class FilmService {
 
         // Удаляем лайк пользователя
         log.debug("Удаляем фильм с id {} из коллекции пользователя с id {}", film.getId(), user.getId());
-        film.getLikes().remove(userId);
-
-        // Сохраняем изменение фильма в хранилище
-        filmStorage.save(film);
+        filmStorage.removeLike(film.getId(), user.getId());
 
         log.debug("Возврат результата удаления лайка на уровень контроллера");
     }
 
-    public void deleteFilm(Long filmId) {
+    /**
+     * Метод удаляет фильм и все его связи из хранилища
+     *
+     * @param filmId идентификатор фильма
+     * @throws NotFoundException если фильм не найден
+     */
+    public void deleteFilm(Long filmId) throws NotFoundException {
         log.debug("Удаление фильма на уровне сервиса");
 
         if (filmId == null) {
@@ -294,16 +296,19 @@ public class FilmService {
         log.debug("У фильма с id {} удалены все лайки", film.getId());
 
         // Удаляем фильм
-        filmStorage.delete(film.getId());
+        filmStorage.deleteFilm(film.getId());
 
         log.debug("Возврат результатов удаления на уровень контроллера");
     }
 
+    /**
+     * Метод очищает хранилище фильмов
+     */
     public void clearFilms() {
         log.debug("Очистка списка фильмов на уровне сервиса");
 
         // Очищаем хранилище
-        filmStorage.clear();
+        filmStorage.clearFilms();
         log.debug("Все фильмы удалены");
 
         log.debug("Возврат результатов очистки на уровень контроллера");
@@ -314,8 +319,9 @@ public class FilmService {
      *
      * @param film экземпляр сущности {@link Film}
      * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException в случае ненайденных идентификаторов из коллекций
      */
-    private void validate(Film film) throws ValidationException {
+    private void validate(Film film) throws ValidationException, NotFoundException {
         // Валидация наименования
         validateName(film.getName());
 
@@ -327,6 +333,12 @@ public class FilmService {
 
         // Валидация длительности
         validateDuration(film.getDuration());
+
+        // Валидация рейтинга
+        validateRating(film.getMpa());
+
+        // Валидация жанров
+        validateGenres(film.getGenres());
     }
 
     /**
@@ -339,7 +351,6 @@ public class FilmService {
         log.debug("Запускаем валидацию наименования");
         // Наименование не должно быть пустым
         if (name == null || name.isBlank()) {
-            log.debug("Передано пустое наименование");
             throw new ValidationException("Название не может быть пустым");
         }
         log.debug("Передано корректное значение name: {}", name);
@@ -399,5 +410,101 @@ public class FilmService {
         }
         log.debug("Передано корректное значение duration: {}", duration == null ? "null" : duration);
         log.debug("Валидация длительности успешно завершена");
+    }
+
+    /**
+     * Валидация рейтинга сущности {@link Film}
+     *
+     * @param rating экземпляр класса {@link Mpa}
+     * @throws NotFoundException если рейтинг не найден
+     */
+    private void validateRating(Mpa rating) throws NotFoundException {
+        log.debug("Запускаем валидацию рейтинга");
+
+        // Если рейтинг указан
+        if (rating != null && rating.getId() != null) {
+            // Проверяем его наличие по id в хранилище
+            Optional<Mpa> check = mpaStorage.findById(rating.getId());
+            if (check.isEmpty()) {
+                throw new NotFoundException("Рейтинг с id " + rating.getId() + " не найден");
+            }
+        }
+        log.debug("Валидация рейтинга успешно завершена");
+    }
+
+    /**
+     * Валидация коллекции жанров сущности {@link Film}
+     *
+     * @param genres коллекция экземпляров класса {@link Genre}
+     * @throws NotFoundException если жанр не найден по идентификатору
+     */
+    private void validateGenres(Collection<Long> genres) throws NotFoundException {
+        log.debug("Запускаем валидацию жанров");
+
+        // Если жанры указаны
+        if (!genres.isEmpty()) {
+            for (Long genreId : genres) {
+                Optional<Genre> check = genreStorage.findById(genreId);
+                if (check.isEmpty()) {
+                    throw new NotFoundException("Жанр с id " + genreId + " не найден");
+                }
+            }
+        }
+        log.debug("Валидация жанров успешно завершена");
+    }
+
+    /**
+     * Метод заполняет данными коллекции DTO
+     *
+     * @param dto экземпляр класса {@link FilmDto}
+     */
+    private void completeDto(FilmDto dto) {
+        if (dto != null) {
+            log.debug("Формирование полей для фильма с id {}", dto.getId());
+
+            // Заполняем коллекцию жанров фильма
+            completeGenres(dto);
+
+            // Заполняем коллекцию лайков фильма
+            completeLikes(dto);
+        }
+    }
+
+    /**
+     * Метод заполняет данными коллекцию жанров DTO
+     *
+     * @param dto экземпляр класса {@link FilmDto}
+     */
+    private void completeGenres(FilmDto dto) {
+        log.debug("Заполнение коллекций жанров фильма");
+
+        // Получаем список жанров фильма
+        Set<GenreDto> genres = genreStorage.findByFilmId(dto.getId()).stream()
+                .map(GenreMapper::mapToGenreDto)
+                .collect(Collectors.toSet());
+        log.debug("Для фильма с id {} получена коллекция жанров размером {}", dto.getId(), genres.size());
+
+        // Устанавливаем полученную коллекцию фильму
+        dto.setGenres(new TreeSet<>(genres));
+        log.debug("Полученная коллекция жанров установлена фильму");
+    }
+
+    /**
+     * Метод заполняет данными коллекцию лайков DTO
+     *
+     * @param dto экземпляр класса {@link FilmDto}
+     */
+    private void completeLikes(FilmDto dto) {
+        log.debug("Заполнение коллекций лайков фильма");
+
+        // Получаем список лайков фильма
+        Set<UserShortDto> likes = userStorage.findByFilmId(dto.getId()).stream()
+                .map(UserMapper::mapToUserShortDto)
+                .collect(Collectors.toSet());
+        log.debug("Для фильма с id {}  получена коллекция лайков размером {}", dto.getId(), likes.size());
+
+        // Устанавливаем полученную коллекцию фильму
+        dto.setLikes(new TreeSet<>(likes));
+        log.debug("Полученная коллекция лайков установлена фильму");
     }
 }

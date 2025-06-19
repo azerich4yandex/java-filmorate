@@ -23,6 +23,8 @@ public class CommonExceptionHandler {
      */
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, String>> handleNotFound(final NotFoundException e) {
+        log.warn("Вызвано исключение NotFoundException с текстом {}", e.getMessage());
+
         return new ResponseEntity<>(Map.of("error", "Сущность не найдена", "errorMessage", e.getMessage()),
                 HttpStatus.NOT_FOUND);
     }
@@ -35,6 +37,8 @@ public class CommonExceptionHandler {
      */
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, String>> handleValidation(final ValidationException e) {
+        log.warn("Вызвано исключение ValidationException с текстом {}", e.getMessage());
+
         return new ResponseEntity<>(Map.of("error", "Ошибка валидации данных", "errorMessage", e.getMessage()),
                 HttpStatus.BAD_REQUEST);
     }
@@ -47,6 +51,8 @@ public class CommonExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntime(final RuntimeException e) {
+        log.warn("Вызвано исключение RuntimeException с текстом {}", e.getMessage());
+
         return new ResponseEntity<>(Map.of("error", "Произошла непредвиденная ошибка", "errorMessage", e.getMessage()),
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }

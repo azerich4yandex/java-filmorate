@@ -4,74 +4,75 @@ import jakarta.validation.ValidationException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
-import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.UserStorage;
+import ru.yandex.practicum.filmorate.storage.db.dto.create.NewUserRequest;
+import ru.yandex.practicum.filmorate.storage.db.dto.read.UserDto;
+import ru.yandex.practicum.filmorate.storage.db.dto.read.UserShortDto;
+import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateUserRequest;
+import ru.yandex.practicum.filmorate.storage.db.mappers.UserMapper;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final UserStorage userStorage;
 
-    @Autowired
-    public UserService(UserStorage userStorage) {
-        this.userStorage = userStorage;
-    }
-
     /**
-     * Метод возвращает коллекцию {@link User}
+     * Метод возвращает коллекцию {@link UserDto}
      *
-     * @return коллекцию {@link User}
+     * @param size максимальный размер коллекции
+     * @param from номер стартового элемента
+     * @return результирующая коллекция
      */
-    public Collection<User> findAll() {
+    public Collection<UserDto> findAll(Integer size, Integer from) {
         log.debug("Запрос всех пользователей на уровне сервиса");
+        log.debug("Размер запрашиваемой коллекции: {}", size);
+        log.debug("Номер стартового элемента: {}", from);
 
-        Collection<User> result = userStorage.findAll();
-        log.debug("На уровень сервиса вернулась коллекция размером {}", result.size());
+        Collection<User> searchResult = userStorage.findAll(size, from);
+        log.debug("На уровень сервиса вернулась коллекция размером {}", searchResult.size());
+
+        Collection<UserDto> result = searchResult.stream().map(UserMapper::mapToUserDto).toList();
+
+        // Перебираем полученную коллекцию
+        for (UserDto user : result) {
+            // Заполняем коллекции
+            completeDto(user);
+        }
+        log.debug("Найденная коллекция преобразована. Размер коллекции после преобразования: {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень контроллера");
         return result;
     }
 
     /**
-     * Метод возвращает экземпляр класса {@link User}, найденный по идентификатору
+     * Метод получает список из {@link UserDto} на основе размера коллекции {@link UserDto#getFriends()}
      *
      * @param userId идентификатор пользователя
-     * @return экземпляр класса {@link User}
-     * @throws ValidationException если передан пустой userId
+     * @return результирующая коллекция
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если пользователь не найден
      */
-    public User findById(Long userId) throws ValidationException {
-        log.debug("Поиск пользователя по id на уровне сервиса");
-
-        if (userId == null) {
-            throw new ValidationException("Передан пустой userId");
-        }
-        log.debug("Передан id пользователя: {}", userId);
-
-        User user = userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
-        log.debug("Найден пользователь с id {}", user.getId());
-
-        log.debug("Возврат результата поиска на уровень контроллера");
-        return user;
-    }
-
-    public Collection<User> findFriends(Long userId) {
+    public Collection<UserDto> findFriends(Long userId) throws ValidationException, NotFoundException {
         log.debug("Запрос друзей пользователя на уровне сервиса");
 
         if (userId == null) {
-            throw new NotFoundException("Передан пустой userId");
+            throw new ValidationException("Передан пустой userId");
         }
         log.debug("Передан userId пользователя: {}", userId);
 
@@ -79,137 +80,164 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
         log.debug("Найден пользователь с  id  {} ", user.getId());
 
-        Collection<User> result = user.getFriends().stream().map(id -> userStorage.findById(id).orElse(null))
-                .filter(Objects::nonNull).toList();
-        log.debug("Получена коллекция друзей пользователя размером {}", result.size());
+        Collection<User> searchResult = userStorage.findFriends(user.getId());
+        log.debug("Получена коллекция друзей пользователя размером {}", searchResult.size());
+
+        Collection<UserDto> result = searchResult.stream().map(UserMapper::mapToUserDto).toList();
+        // Перебираем полученную коллекцию
+        for (UserDto model : result) {
+            // Заполняем коллекции
+            completeDto(model);
+        }
+        log.debug("Найденная коллекция друзей преобразована. Размер преобразованной коллекции {}", result.size());
 
         log.debug("Возврат результатов на уровень контроллера");
         return result;
     }
 
-    public Collection<User> findCommonFriends(Long userId, Long friendId) {
+    /**
+     * Метод получает список из {@link UserDto} на основе пересечения двух коллекций {@link UserDto#getFriends()}
+     *
+     * @param userId идентификатор первого пользователя
+     * @param friendId идентификатор второго пользователя
+     * @return результирующая коллекция
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если один из пользователей не найден
+     */
+    public Collection<UserDto> findCommonFriends(Long userId, Long friendId) throws ValidationException,
+                                                                                    NotFoundException {
         log.debug("Запрос общих друзей двух пользователей на уровне сервиса");
         log.debug("Передан id первого пользователя: {}", userId);
         log.debug("Передан id второго пользователя: {}", friendId);
 
+        if (userId == null) {
+            throw new ValidationException("Передан пустой userId");
+        }
+
+        if (friendId == null) {
+            throw new ValidationException("Передан пустой friendId");
+        }
+
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+
+        User friend = userStorage.findById(friendId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден"));
+
         // Получаем список друзей пользователя
-        Collection<User> userFriends = findFriends(userId);
-
-        // Получаем список друзей друга
-        Collection<User> friendFriends = findFriends(friendId);
-
-        // Получаем пересечение коллекций
-        Collection<User> result = userFriends.stream().filter(Objects::nonNull).filter(friendFriends::contains)
-                .toList();
+        Collection<User> searchResult = userStorage.findCommonFriends(user.getId(), friend.getId());
         log.debug("Получен список общих друзей между пользователем с id {} и другом с id {} размером {}", userId,
-                friendId, result.size());
+                friendId, searchResult.size());
+
+        Collection<UserDto> result = searchResult.stream().map(UserMapper::mapToUserDto).toList();
+        // Перебираем полученную коллекцию
+        for (UserDto model : result) {
+            // Заполняем коллекции
+            completeDto(model);
+        }
+        log.debug("Коллекция общих друзей преобразована. Размер коллекции после преобразования: {}", result.size());
 
         log.debug("Возврат результатов поиска общих друзей на уровень контроллера");
         return result;
     }
 
     /**
-     * Метод проверяет переданную модель {@link User} и передает для сохранения на уровень хранилища, после чего
-     * сохранённую модель возвращает на уровень контроллера
+     * Метод возвращает экземпляр класса {@link UserDto}, найденный по идентификатору
      *
-     * @param user несохранённый экземпляр класса {@link User}
-     * @return сохраненный экземпляр класса {@link User}
+     * @param userId идентификатор пользователя
+     * @return экземпляр класса {@link UserDto}
+     * @throws ValidationException если передан пустой userId
+     * @throws NotFoundException если пользователь не найден
      */
-    public User create(User user) {
+    public UserDto findById(Long userId) throws ValidationException, NotFoundException {
+        log.debug("Поиск пользователя по id на уровне сервиса");
+
+        if (userId == null) {
+            throw new ValidationException("Передан пустой userId");
+        }
+        log.debug("Передан id пользователя: {}", userId);
+
+        User searchResult = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+        log.debug("Пользователь с id {} найден в хранилище", searchResult.getId());
+
+        UserDto result = UserMapper.mapToUserDto(searchResult);
+        // Заполняем коллекции
+        completeDto(result);
+        log.debug("Найденный пользователь с id {} преобразован", result.getId());
+
+        log.debug("Возврат результата поиска на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод проверяет переданную модель и передает для сохранения на уровень хранилища, после чего сохранённую модель
+     * возвращает на уровень контроллера
+     *
+     * @param request несохранённый экземпляр класса {@link NewUserRequest}
+     * @return сохраненный экземпляр класса {@link UserDto}
+     * @throws ValidationException в случае ошибок валидации
+     */
+    public UserDto create(NewUserRequest request) throws ValidationException {
         log.debug("Создание пользователя на уровне сервиса");
+
+        User user = UserMapper.mapToUser(request);
+        log.debug("Переданная модель преобразована");
 
         log.debug("Валидация переданной модели");
         validate(user);
         log.debug("Валидация модели завершена");
 
-        log.debug("Сохранение данных в хранилище");
-        user = userStorage.create(user);
-        log.debug("Данные в хранилище сохранены");
+        user = userStorage.createUser(user);
+
+        UserDto result = UserMapper.mapToUserDto(user);// Перебираем полученную коллекцию
+        // Заполняем коллекции
+        completeDto(result);
+        log.debug("Сохраненная модель преобразована");
 
         log.debug("Возврат результата добавления на уровень контроллера");
-        return user;
+        return result;
     }
 
     /**
-     * Метод проверяет переданную модель {@link User} и передает для обновления на уровень хранилища, после чего
-     * сохранённую модель возвращает на уровень контроллера
+     * Метод проверяет переданную модель и передает для обновления на уровень хранилища, после чего сохранённую модель
+     * возвращает на уровень контроллера
      *
-     * @param newUser несохраненный экземпляр класса {@link User}
-     * @return сохраненный экземпляр класса {@link User}
+     * @param request несохраненный экземпляр класса {@link UpdateUserRequest}
+     * @return сохраненный экземпляр класса {@link UserDto}
      * @throws ValidationException в случае ошибок валидации
      * @throws NotFoundException если пользователь для обновления не найден
      */
-    public User update(User newUser) throws ValidationException, NotFoundException {
+    public UserDto update(UpdateUserRequest request) throws ValidationException, NotFoundException {
         log.debug("Обновление пользователя на уровне сервиса");
 
-        if (newUser.getId() == null) {
+        if (request.getId() == null) {
             throw new ValidationException("Id должен быть указан");
         }
-        log.debug("Передан пользователь с id: {}", newUser.getId());
+        log.debug("Передан пользователь с id: {}", request.getId());
 
         // Получаем пользователя из хранилища
-        User existingUser = userStorage.findById(newUser.getId()).orElseThrow(
-                () -> new NotFoundException("Пользователь с id " + newUser.getId() + " не найден в хранилище"));
+        User existingUser = userStorage.findById(request.getId()).orElseThrow(
+                () -> new NotFoundException("Пользователь с id " + request.getId() + " не найден в хранилище"));
         log.debug("В хранилище найден пользователь по id {}", existingUser.getId());
 
+        User updatedUser = UserMapper.updateUserFields(existingUser, request);
+
         // Проверяем переданного пользователя
-        validate(newUser);
+        log.debug("Валидация обновленной модели");
+        validate(updatedUser);
+        log.debug("Валидация обновленной модели завершена");
 
-        // Флаг необходимости изменения данных
-        boolean valuesAreChanged = false;
+        // Сохраняем изменения
+        updatedUser = userStorage.updateUser(updatedUser);
 
-        // Проверяем изменение электронной почты
-        if (!newUser.getEmail().equalsIgnoreCase(existingUser.getEmail())) {
-            log.debug("Будет изменена электронная почта пользователя с {} на {}", existingUser.getEmail(),
-                    newUser.getEmail());
-            existingUser.setEmail(newUser.getEmail());
-            valuesAreChanged = true;
-        }
-
-        // Проверяем изменение логина
-        if (!newUser.getLogin().equals(existingUser.getLogin())) {
-            log.debug("Будет изменён логин пользователя с {} на {}", existingUser.getLogin(), newUser.getLogin());
-
-            existingUser.setLogin(newUser.getLogin());
-
-            valuesAreChanged = true;
-        }
-
-        // Проверяем изменение отображаемого имени
-        if (!newUser.getName().equals(existingUser.getName())) {
-            log.debug("Будет изменено отображаемое имя пользователя с {} на {}", existingUser.getName(),
-                    newUser.getName());
-
-            existingUser.setName(newUser.getName());
-
-            valuesAreChanged = true;
-        }
-
-        // Проверяем изменение даты рождения
-        if (!newUser.getBirthday().equals(existingUser.getBirthday())) {
-            log.debug("Будет изменена дата рождения пользователя с {} на {}",
-                    existingUser.getBirthday().format(DATE_FORMATTER), newUser.getBirthday().format(DATE_FORMATTER));
-
-            existingUser.setBirthday(newUser.getBirthday());
-
-            valuesAreChanged = true;
-        }
-
-        // Если изменения данных были
-        if (valuesAreChanged) {
-            // Проводим валидацию с учётом изменений
-            log.debug("Валидация обновлённой модели");
-            validate(existingUser);
-            log.debug("Валидация обновлённой модели завершена");
-
-            // Сохраняем изменения
-            userStorage.update(existingUser);
-        } else {
-            log.info("Изменения не обнаружены");
-        }
+        UserDto result = UserMapper.mapToUserDto(updatedUser);
+        // Заполняем коллекции
+        completeDto(result);
+        log.debug("Обновленная модель преобразована");
 
         log.debug("Возврат результата обновления на уровень контроллера");
-        return existingUser;
+        return result;
     }
 
     /**
@@ -217,9 +245,11 @@ public class UserService {
      *
      * @param userId идентификатор пользователя
      * @param friendId идентификатор друга
-     * @throws RuntimeException при неожиданной ошибке
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если один из пользователей не найден
+     * @throws RuntimeException при ошибке добавления друга
      */
-    public void addFriend(Long userId, Long friendId) throws RuntimeException {
+    public void addFriend(Long userId, Long friendId) throws ValidationException, NotFoundException, RuntimeException {
         log.debug("Добавление друзей на уровне сервиса");
 
         if (userId == null) {
@@ -242,17 +272,7 @@ public class UserService {
         if (user != null && friend != null) {
             // Добавляем пользователю друга в друзья
             log.debug("Добавляем друга с id {} в коллекцию пользователя с id {}", friendId, userId);
-            user.getFriends().add(friend.getId());
-
-            log.debug("Сохраняем изменение пользователя в хранилище");
-            userStorage.save(user);
-
-            // Добавляем другу пользователя в друзья
-            log.debug("Добавляем пользователя с id {} в коллекцию друга с id {}", userId, friendId);
-            friend.getFriends().add(user.getId());
-
-            log.debug("Сохраняем изменение друга в хранилище");
-            userStorage.save(friend);
+            userStorage.addFriend(userId, friendId);
         } else {
             throw new RuntimeException("Во время добавления в друзья произошла непредвиденная ошибка");
         }
@@ -265,8 +285,10 @@ public class UserService {
      *
      * @param userId идентификатор пользователя
      * @param friendId идентификатор друга
+     * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException если один из пользователей не найден
      */
-    public void removeFriend(Long userId, Long friendId) {
+    public void removeFriend(Long userId, Long friendId) throws ValidationException, NotFoundException {
         log.debug("Удаление друзей на уровне сервиса");
 
         if (userId == null) {
@@ -289,16 +311,7 @@ public class UserService {
         if (user != null && friend != null) {
             // Удаляем из друзей пользователя друга
             log.debug("Удаляем друга с id {} из друзей пользователя с id {}", friendId, userId);
-            user.getFriends().remove(friend.getId());
-
-            log.debug("Сохраняем изменение друзей пользователя в хранилище");
-            userStorage.save(user);
-
-            // Удаляем из друзей друга пользователя
-            friend.getFriends().remove(user.getId());
-
-            log.debug("Сохраняем изменение друзей друга в хранилище");
-            userStorage.save(friend);
+            userStorage.removeFriend(userId, friendId);
         } else {
             throw new RuntimeException("Во время удаления из друзей произошла непредвиденная ошибка");
         }
@@ -307,11 +320,12 @@ public class UserService {
     }
 
     /**
-     * Метод удаляет {@link User} и все его связи из хранилища
+     * Метод удаляет пользователя и все его связи из хранилища
      *
      * @param userId идентификатор пользователя
+     * @throws NotFoundException если пользователь не найден
      */
-    public void deleteUser(Long userId) {
+    public void deleteUser(Long userId) throws NotFoundException {
         log.debug("Удаление пользователя на уровне сервиса");
 
         if (userId == null) {
@@ -336,16 +350,19 @@ public class UserService {
             }
         }
         // Удаляем пользователя
-        userStorage.delete(user.getId());
+        userStorage.deleteUser(user.getId());
 
         log.debug("Возврат результата удаления на уровень контроллера");
     }
 
+    /**
+     * Метод очищает хранилище пользователей
+     */
     public void clearUsers() {
         log.debug("Очистка списка пользователей на уровне сервиса");
 
         // Очищаем хранилище
-        userStorage.clear();
+        userStorage.clearUsers();
 
         log.debug("Возврат результата очистки на уровень контроллера");
     }
@@ -355,8 +372,9 @@ public class UserService {
      *
      * @param user экземпляр сущности {@link User}
      * @throws ValidationException в случае ошибок валидации
+     * @throws NotFoundException в случае ненайденных идентификаторов из коллекций
      */
-    private void validate(User user) throws ValidationException {
+    private void validate(User user) throws ValidationException, NotFoundException {
         // Валидация электронной почты
         validateEmail(user);
 
@@ -365,6 +383,9 @@ public class UserService {
 
         // Валидация даты рождения
         validateBirthday(user);
+
+        // Валидация друзей
+        validateFriends(user);
     }
 
     /**
@@ -433,8 +454,9 @@ public class UserService {
      * Валидация даты рождения сущности {@link User}
      *
      * @param user экземпляр класса {@link User}
+     * @throws ValidationException в случае ошибок валидации
      */
-    private void validateBirthday(User user) {
+    private void validateBirthday(User user) throws ValidationException {
         log.debug("Запускаем валидацию даты рождения");
         if (user.getBirthday() == null) {
             throw new ValidationException("Дата рождения должна быть указана");
@@ -445,5 +467,58 @@ public class UserService {
         }
         log.debug("Передано корректное значение birthday: {}", user.getBirthday().format(DATE_FORMATTER));
         log.debug("Валидация даты рождения успешно завершена");
+    }
+
+    /**
+     * Валидация коллекции друзей сущности {@link User}
+     *
+     * @param user экземпляр сущности {@link User}
+     * @throws NotFoundException если друг не найден по идентификатору
+     */
+    private void validateFriends(User user) throws NotFoundException {
+        log.debug("Запускаем валидацию списка друзей");
+        if (!user.getFriends().isEmpty()) {
+            for (Long friendId : user.getFriends()) {
+                UserDto friend = findById(friendId);
+                if (friend == null) {
+                    throw new NotFoundException("Пользователь с id " + friendId + " не найден");
+                }
+            }
+            log.debug("Передано корректное значение списка друзей: {}", user.getFriends());
+        }
+        log.debug("Валидация списка друзей успешно завершена");
+    }
+
+    /**
+     * Метод заполняет данными коллекции DTO
+     *
+     * @param dto экземпляр класса {@link UserDto}
+     */
+    private void completeDto(UserDto dto) {
+        if (dto != null) {
+            log.debug("Формирование полей для пользователя с id {}", dto.getId());
+
+            // Заполняем коллекцию друзей пользователя
+            completeFriends(dto);
+        }
+    }
+
+    /**
+     * Метод заполняет данными коллекцию друзей DTO
+     *
+     * @param dto экземпляр класса {@link UserDto}
+     */
+    private void completeFriends(UserDto dto) {
+        log.debug("Заполнение коллекции друзей пользователя");
+
+        // Получаем список друзей
+        Set<UserShortDto> friends = userStorage.findFriends(dto.getId()).stream()
+                .map(UserMapper::mapToUserShortDto)
+                .collect(Collectors.toSet());
+        log.debug("Для пользователя с id {} получена коллекция друзей размером {}", dto.getId(), friends.size());
+
+        // Устанавливаем полученную коллекцию пользователю
+        dto.setFriends(new TreeSet<>(friends));
+        log.debug("Полученная коллекция друзей установлена пользователю");
     }
 }
