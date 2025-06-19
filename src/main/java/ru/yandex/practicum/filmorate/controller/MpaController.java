@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.service.MpaService;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewMpaRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.MpaDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateMpaRequest;
+import ru.yandex.practicum.filmorate.dto.mpa.NewMpaRequest;
+import ru.yandex.practicum.filmorate.dto.mpa.MpaDto;
+import ru.yandex.practicum.filmorate.dto.mpa.UpdateMpaRequest;
 
 @Slf4j
 @RestController

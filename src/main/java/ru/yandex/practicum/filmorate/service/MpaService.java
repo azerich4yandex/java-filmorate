@@ -8,12 +8,12 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.storage.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.MpaStorage;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewMpaRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.MpaDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateMpaRequest;
-import ru.yandex.practicum.filmorate.storage.db.mappers.MpaMapper;
+import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
+import ru.yandex.practicum.filmorate.dal.mpa.MpaStorage;
+import ru.yandex.practicum.filmorate.dto.mpa.NewMpaRequest;
+import ru.yandex.practicum.filmorate.dto.mpa.MpaDto;
+import ru.yandex.practicum.filmorate.dto.mpa.UpdateMpaRequest;
+import ru.yandex.practicum.filmorate.mapper.MpaMapper;
 
 @Slf4j
 @Service

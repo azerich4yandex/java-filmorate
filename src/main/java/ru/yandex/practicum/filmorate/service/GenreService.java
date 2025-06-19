@@ -8,12 +8,12 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.storage.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.GenreStorage;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewGenreRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.GenreDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateGenreRequest;
-import ru.yandex.practicum.filmorate.storage.db.mappers.GenreMapper;
+import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
+import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
+import ru.yandex.practicum.filmorate.dto.genre.NewGenreRequest;
+import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
+import ru.yandex.practicum.filmorate.dto.genre.UpdateGenreRequest;
+import ru.yandex.practicum.filmorate.mapper.GenreMapper;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link Genre} на уровне сервиса

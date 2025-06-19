@@ -4,9 +4,10 @@ import jakarta.validation.ValidationException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,18 +17,18 @@ import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.GenreStorage;
-import ru.yandex.practicum.filmorate.storage.MpaStorage;
-import ru.yandex.practicum.filmorate.storage.UserStorage;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewFilmRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.FilmDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.GenreDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.UserShortDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateFilmRequest;
-import ru.yandex.practicum.filmorate.storage.db.mappers.FilmMapper;
-import ru.yandex.practicum.filmorate.storage.db.mappers.GenreMapper;
-import ru.yandex.practicum.filmorate.storage.db.mappers.UserMapper;
+import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
+import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
+import ru.yandex.practicum.filmorate.dal.mpa.MpaStorage;
+import ru.yandex.practicum.filmorate.dal.user.UserStorage;
+import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
+import ru.yandex.practicum.filmorate.dto.film.FilmDto;
+import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
+import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
+import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
+import ru.yandex.practicum.filmorate.mapper.FilmMapper;
+import ru.yandex.practicum.filmorate.mapper.GenreMapper;
+import ru.yandex.practicum.filmorate.mapper.UserMapper;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -481,11 +482,12 @@ public class FilmService {
         // Получаем список жанров фильма
         Set<GenreDto> genres = genreStorage.findByFilmId(dto.getId()).stream()
                 .map(GenreMapper::mapToGenreDto)
-                .collect(Collectors.toSet());
+                .sorted(Comparator.comparing(GenreDto::getId))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         log.debug("Для фильма с id {} получена коллекция жанров размером {}", dto.getId(), genres.size());
 
         // Устанавливаем полученную коллекцию фильму
-        dto.setGenres(new TreeSet<>(genres));
+        dto.setGenres(genres);
         log.debug("Полученная коллекция жанров установлена фильму");
     }
 
@@ -504,7 +506,7 @@ public class FilmService {
         log.debug("Для фильма с id {}  получена коллекция лайков размером {}", dto.getId(), likes.size());
 
         // Устанавливаем полученную коллекцию фильму
-        dto.setLikes(new TreeSet<>(likes));
+        dto.setLikes(likes);
         log.debug("Полученная коллекция лайков установлена фильму");
     }
 }

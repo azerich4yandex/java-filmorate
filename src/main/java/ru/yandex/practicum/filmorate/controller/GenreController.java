@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.filmorate.service.GenreService;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewGenreRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.GenreDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateGenreRequest;
+import ru.yandex.practicum.filmorate.dto.genre.NewGenreRequest;
+import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
+import ru.yandex.practicum.filmorate.dto.genre.UpdateGenreRequest;
 
 @Slf4j
 @RestController

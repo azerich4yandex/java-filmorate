@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -14,12 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.UserStorage;
-import ru.yandex.practicum.filmorate.storage.db.dto.create.NewUserRequest;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.UserDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.read.UserShortDto;
-import ru.yandex.practicum.filmorate.storage.db.dto.update.UpdateUserRequest;
-import ru.yandex.practicum.filmorate.storage.db.mappers.UserMapper;
+import ru.yandex.practicum.filmorate.dal.user.UserStorage;
+import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
+import ru.yandex.practicum.filmorate.dto.user.UserDto;
+import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
+import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
+import ru.yandex.practicum.filmorate.mapper.UserMapper;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -518,7 +517,7 @@ public class UserService {
         log.debug("Для пользователя с id {} получена коллекция друзей размером {}", dto.getId(), friends.size());
 
         // Устанавливаем полученную коллекцию пользователю
-        dto.setFriends(new TreeSet<>(friends));
+        dto.setFriends(friends);
         log.debug("Полученная коллекция друзей установлена пользователю");
     }
 }
