@@ -1,6 +1,7 @@
 package ru.yandex.practicum.filmorate.model;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
@@ -59,5 +60,24 @@ public class User {
         } else {
             return name;
         }
+    }
+
+    /**
+     * Метод возвращает коллекцию идентификаторов друзей пользователя
+     *
+     * @return коллекция друзей идентификаторов пользователя
+     */
+    public Collection<Long> getFriends() {
+        return this.friends.stream().toList();
+    }
+
+    /**
+     * Метод обновляет коллекцию идентификаторов друзей пользователя
+     *
+     * @param friendIds коллекция идентификаторов друзей пользователя
+     */
+    public void setFriends(Collection<Long> friendIds) {
+        this.friends.clear();
+        this.friends.addAll(friendIds);
     }
 }

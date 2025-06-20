@@ -1,4 +1,4 @@
-package ru.yandex.practicum.filmorate.storage;
+package ru.yandex.practicum.filmorate.dal.user;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -14,9 +14,36 @@ public interface UserStorage {
     /**
      * Метод возвращает коллекцию {@link User} из хранилища
      *
+     * @param size максимальный размер возвращаемой коллекции
+     * @param from номер стартового элемента
      * @return коллекция {@link User}
      */
-    Collection<User> findAll();
+    Collection<User> findAll(Integer size, Integer from);
+
+    /**
+     * Метод возвращает коллекцию {@link User}, которым понравился фильм
+     *
+     * @param filmId идентификатор фильма
+     * @return коллекция {@link User}, которым понравился фильм
+     */
+    Collection<User> findByFilmId(Long filmId);
+
+    /**
+     * Метод возвращает коллекцию друзей пользователя
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция друзей пользователя
+     */
+    Collection<User> findFriends(Long userId);
+
+    /**
+     * Метод возвращает коллекцию общих друзей пользователя
+     *
+     * @param userId идентификатор первого пользователя
+     * @param friendId идентификатор второго пользователя
+     * @return коллекция общих друзей пользователя
+     */
+    Collection<User> findCommonFriends(Long userId, Long friendId);
 
     /**
      * Метод возвращает экземпляр класса {@link User} из хранилища на основе переданного идентификатора
@@ -32,7 +59,7 @@ public interface UserStorage {
      * @param user экземпляр класса {@link User}
      * @return экземпляр класса {@link User} с заполненными автоматически генерируемыми полями из хранилища
      */
-    User create(User user);
+    User createUser(User user);
 
     /**
      * Метод обновляет в хранилище переданный экземпляр класса {@link User}
@@ -40,26 +67,35 @@ public interface UserStorage {
      * @param newUser экземпляр класса {@link User} для обновления
      * @return обновленный экземпляр класса {@link User} из хранилища
      */
-    User update(User newUser);
+    User updateUser(User newUser);
 
     /**
-     * Метод сохраняет в хранилище переданный экземпляр класса {@link User}
+     * Метод добавляет пользователя в коллекцию его друзей
      *
-     * @param user экземпляр класса {@link User}
+     * @param userId идентификатор пользователя
+     * @param friendId идентификатор друга
      */
-    void save(User user);
+    void addFriend(Long userId, Long friendId);
 
     /**
-     * Метод удаляет из хранилища переданный экземпляр класса
+     * Метод удаляет друга из коллекции пользователя
+     *
+     * @param userId идентификатор пользователя
+     * @param friendId идентификатор друга
+     */
+    void removeFriend(Long userId, Long friendId);
+
+    /**
+     * Метод удаляет экземпляр класса {@link User}, найденный в хранилище по id
      *
      * @param userId идентификатор пользователя
      */
-    void delete(Long userId);
+    void deleteUser(Long userId);
 
     /**
      * Метод очищает хранилище пользователей
      */
-    void clear();
+    void clearUsers();
 
     /**
      * Метод проверяет использование почтового адреса другими пользователями
