@@ -23,10 +23,10 @@ import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 /**
  * Контроллер для обработки HTTP-запросов для "/users"
  */
-@Slf4j
-@RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/users")
+@RestController
 public class UserController {
 
     private final UserService userService;
