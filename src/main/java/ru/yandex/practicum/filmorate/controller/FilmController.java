@@ -14,10 +14,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.yandex.practicum.filmorate.service.FilmService;
-import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
+import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
 import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
+import ru.yandex.practicum.filmorate.service.FilmService;
 
 /**
  * Контроллер для обработки HTTP-запросов для /films
@@ -70,15 +70,19 @@ public class FilmController {
     }
 
     /**
-     * Обработка GET-запроса для /films/popular?count={count}
+     * Обработка GET-запроса для /films/popular?count={limit}&genreId={genreId}&year={year}
      */
-    @GetMapping("/popular")
+    @GetMapping("/popular?count={limit}&genreId={genreId}&year={year}")
     public ResponseEntity<Collection<FilmDto>> findPopular(
-            @RequestParam(name = "count", required = false, defaultValue = "10") Integer count) {
+            @RequestParam(name = "limit", required = false, defaultValue = "10") Integer count,
+            @RequestParam(name = "genreId", required = false) Long genreId,
+            @RequestParam(name = "year", required = false) Integer year) {
         log.info("Поиск топ фильмов на уровне контроллера");
         log.debug("Передано значение count = {}", count);
+        log.debug("Передано значение genreId = {}", genreId);
+        log.debug("Передано значение year = {}", year);
 
-        Collection<FilmDto> result = filmService.findPopular(count);
+        Collection<FilmDto> result = filmService.findPopular(count, genreId, year);
         log.debug("На уровень контроллера вернулась коллекция топ-фильмов размером {}", result.size());
 
         log.info("Возвращение топ фильмов на уровень клиента");

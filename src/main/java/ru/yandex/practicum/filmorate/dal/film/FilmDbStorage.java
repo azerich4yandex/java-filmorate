@@ -44,6 +44,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 ON f.RATING_ID = r.ID
              INNER JOIN USERS_FILMS uf
                 ON f.ID = uf.FILM_ID
+             WHERE (f.RATING_ID = ? OR ? IS NULL)
+               AND (EXTRACT(YEAR FROM f.RELEASE_DATE) = ? OR ? IS NULL)
              GROUP BY f.ID,
                    f.FULL_NAME,
                    f.DESCRIPTION,
@@ -187,12 +189,12 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     }
 
     @Override
-    public Collection<Film> findPopular(Integer count) {
+    public Collection<Film> findPopular(Integer count, Long genreId, Integer year) {
         log.debug("Запрос топ фильмов на уровне хранилища");
         log.debug("Размер запрашиваемой коллекции: {}", count);
 
         // Получаем коллекцию популярных фильмов
-        Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, count);
+        Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, genreId, genreId, year, year, count);
         log.debug("На уровне сервиса получена коллекция размером {}", result.size());
 
         // Возвращаем результат
