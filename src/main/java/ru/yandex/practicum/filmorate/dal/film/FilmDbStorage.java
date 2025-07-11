@@ -29,8 +29,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
               FROM FILMS f
               LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
              ORDER BY f.ID
-             LIMIT ?
-            OFFSET ?
+             LIMIT :size
+            OFFSET :from
             """;
     private static final String GET_POPULAR_FILMS_QUERY = """
             SELECT f.ID,
@@ -72,7 +72,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 ON f.RATING_ID = r.ID
              INNER JOIN FILMS f
                 ON fg.FILM_ID = f.ID
-             WHERE fg.GENRE_ID = ?
+             WHERE fg.GENRE_ID = :genreId
              ORDER BY f.ID
             """;
     private static final String GET_ALL_FILMS_BY_RATING_QUERY = """
@@ -86,7 +86,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
               FROM FILMS f
               LEFT JOIN RATINGS r
                 ON f.RATING_ID = r.ID
-             WHERE r.ID = ?
+             WHERE r.ID = :ratingId
             """;
     private static final String GET_FILM_BY_ID_QUERY = """
             SELECT f.ID,
@@ -182,8 +182,13 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Размер коллекции: {}", size);
         log.debug("Номер стартового элемента: {}", from);
 
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("size", size)
+                .addValue("from", from);
+
         // Получаем коллекцию всех фильмов
-        Collection<Film> result = findMany(GET_ALL_FILMS_QUERY, size, from);
+        Collection<Film> result = findManyParametrized(GET_ALL_FILMS_QUERY, parameterSource);
         log.debug("Получена коллекция размером {}", result.size());
 
         // Возвращаем результат
@@ -198,13 +203,14 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Идентификатор жанра: {}", genreId == null ? "null" : genreId);
         log.debug("Год релиза: {}", year == null ? "null" : year);
 
-        MapSqlParameterSource params = new MapSqlParameterSource()
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
                 .addValue("count", count)
                 .addValue("year", year)
                 .addValue("genreId", genreId);
 
         // Получаем коллекцию популярных фильмов
-        Collection<Film> result = findManyParametrized(GET_POPULAR_FILMS_QUERY, params);
+        Collection<Film> result = findManyParametrized(GET_POPULAR_FILMS_QUERY, parameterSource);
         log.debug("На уровне сервиса получена коллекция размером {}", result.size());
 
         // Возвращаем результат
@@ -217,7 +223,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Запрос списка фильмов по жанру");
         log.debug("Идентификатор запрашиваемого жанра: {}", genreId);
 
-        Collection<Film> result = findMany(GET_ALL_FILMS_BY_GENRE_QUERY, genreId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("genreId", genreId);
+
+        Collection<Film> result = findManyParametrized(GET_ALL_FILMS_BY_GENRE_QUERY, parameterSource);
         log.debug("Получена коллекция фильмов размером {}", result.size());
 
         log.debug("Возврат результатов поиска по жанру на уровень сервиса");
@@ -229,7 +239,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Запрос списка фильмов по рейтингу");
         log.debug("Идентификатор запрашиваемого рейтинга: {}", ratingId);
 
-        Collection<Film> result = findMany(GET_ALL_FILMS_BY_RATING_QUERY, ratingId);
+        // Составляем набор параметров
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("ratingId", ratingId);
+
+        Collection<Film> result = findManyParametrized(GET_ALL_FILMS_BY_RATING_QUERY, params);
         log.debug("Получена коллекция фильмов по жанру размером {}", result.size());
 
         log.debug("Возврат результатов поиска по рейтингу на уровень сервиса");
