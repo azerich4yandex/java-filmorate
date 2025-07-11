@@ -6,6 +6,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.model.User;
@@ -132,8 +133,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
             """;
 
     @Autowired
-    public UserDbStorage(JdbcTemplate jdbcTemplate, UserRowMapper userRowMapper) {
-        super(jdbcTemplate, userRowMapper);
+    public UserDbStorage(JdbcTemplate jdbcTemplate, UserRowMapper userRowMapper, NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, userRowMapper);
     }
 
     @Override

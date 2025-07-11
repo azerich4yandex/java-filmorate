@@ -5,6 +5,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -56,8 +57,8 @@ public class MpaDbStorage extends BaseDbStorage<Mpa> implements MpaStorage {
             """;
 
     @Autowired
-    public MpaDbStorage(JdbcTemplate jdbcTemplate, MpaRowMapper mapper) {
-        super(jdbcTemplate, mapper);
+    public MpaDbStorage(JdbcTemplate jdbcTemplate, MpaRowMapper mapper, NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, mapper);
     }
 
     @Override

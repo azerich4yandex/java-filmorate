@@ -5,6 +5,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.model.Genre;
@@ -65,8 +66,9 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
             """;
 
     @Autowired
-    public GenreDbStorage(JdbcTemplate jdbcTemplate, GenreRowMapper genreRowMapper) {
-        super(jdbcTemplate, genreRowMapper);
+    public GenreDbStorage(JdbcTemplate jdbcTemplate, GenreRowMapper genreRowMapper,
+                          NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, genreRowMapper);
     }
 
     @Override

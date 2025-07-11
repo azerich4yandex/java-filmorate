@@ -6,6 +6,8 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
@@ -40,21 +42,22 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    r.FULL_NAME AS rating_name,
                    COUNT(uf.ID) AS cnt
               FROM FILMS f
-              LEFT JOIN RATINGS r
-                ON f.RATING_ID = r.ID
-             INNER JOIN USERS_FILMS uf
-                ON f.ID = uf.FILM_ID
-             WHERE (f.RATING_ID = ? OR ? IS NULL)
-               AND (EXTRACT(YEAR FROM f.RELEASE_DATE) = ? OR ? IS NULL)
+              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+             INNER JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+             WHERE (YEAR(f.RELEASE_DATE) = :year OR :year IS NULL)
+               AND EXISTS (SELECT 1
+               		         FROM FILMS_GENRES fg
+               		        WHERE fg.FILM_ID = f.ID
+               		          AND (fg.GENRE_ID = :genreId OR :genreId IS NULL))
              GROUP BY f.ID,
-                   f.FULL_NAME,
-                   f.DESCRIPTION,
-                   f.DURATION,
-                   f.RELEASE_DATE,
-                   f.RATING_ID,
-                   r.FULL_NAME
+                      f.FULL_NAME,
+                      f.DESCRIPTION,
+                      f.DURATION,
+                      f.RELEASE_DATE,
+                      f.RATING_ID,
+                      r.FULL_NAME
              ORDER BY 8 DESC
-             LIMIT ?
+             LIMIT :count
             """;
     private static final String GET_ALL_FILMS_BY_GENRE_QUERY = """
             SELECT f.ID,
@@ -168,8 +171,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     private final GenreStorage genreStorage;
 
     @Autowired
-    public FilmDbStorage(JdbcTemplate jdbcTemplate, FilmRowMapper filmRowMapper, GenreStorage genreStorage) {
-        super(jdbcTemplate, filmRowMapper);
+    public FilmDbStorage(JdbcTemplate jdbcTemplate, FilmRowMapper filmRowMapper, GenreStorage genreStorage, NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, filmRowMapper);
         this.genreStorage = genreStorage;
     }
 
@@ -192,9 +195,16 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     public Collection<Film> findPopular(Integer count, Long genreId, Integer year) {
         log.debug("Запрос топ фильмов на уровне хранилища");
         log.debug("Размер запрашиваемой коллекции: {}", count);
+        log.debug("Идентификатор жанра: {}", genreId == null ? "null" : genreId);
+        log.debug("Год релиза: {}", year == null ? "null" : year);
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("count", count)
+                .addValue("year", year)
+                .addValue("genreId", genreId);
 
         // Получаем коллекцию популярных фильмов
-        Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, genreId, genreId, year, year, count);
+        Collection<Film> result = findManyParametrized(GET_POPULAR_FILMS_QUERY, params);
         log.debug("На уровне сервиса получена коллекция размером {}", result.size());
 
         // Возвращаем результат

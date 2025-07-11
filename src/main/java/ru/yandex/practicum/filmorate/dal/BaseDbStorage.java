@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 
 @Slf4j
@@ -17,6 +19,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 public class BaseDbStorage<T> {
 
     protected final JdbcTemplate jdbcTemplate;
+    protected final NamedParameterJdbcTemplate namedJdbcTemplate;
     protected final RowMapper<T> mapper;
 
     protected long insert(String query, Object... params) {
@@ -81,6 +84,14 @@ public class BaseDbStorage<T> {
         }, mapper);
 
         log.debug("Операция поиска коллекции завершена");
+        return result;
+    }
+
+    protected Collection<T> findManyParametrized(String query, MapSqlParameterSource params) {
+        log.debug("Начало вызова поиска коллекции с именованными переменными");
+        Collection<T> result = namedJdbcTemplate.query(query, params, mapper);
+
+        log.debug("Операция поиска коллекции с именованными параметрами завершена");
         return result;
     }
 
