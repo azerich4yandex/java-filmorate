@@ -5,6 +5,7 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
@@ -19,14 +20,14 @@ public class MpaDbStorage extends BaseDbStorage<Mpa> implements MpaStorage {
                    r.FULL_NAME
               FROM RATINGS r
              ORDER BY r.ID
-             LIMIT ?
-            OFFSET ?
+             LIMIT :size
+            OFFSET :from
             """;
     private static final String GET_RATING_BY_ID_QUERY = """
             SELECT r.ID,
                    r.FULL_NAME
               FROM RATINGS r
-             WHERE r.ID = ?
+             WHERE r.ID = :ratingId
             """;
     private static final String INSERT_RATING_QUERY = """
             INSERT INTO RATING (FULL_NAME)
@@ -67,7 +68,12 @@ public class MpaDbStorage extends BaseDbStorage<Mpa> implements MpaStorage {
         log.debug("Размер запрашиваемой коллекции: {}", size);
         log.debug("Номер стартового элемента: {}", from);
 
-        Collection<Mpa> result = findMany(GET_ALL_RATINGS_QUERY, size, from);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("size", size)
+                .addValue("from", from);
+
+        Collection<Mpa> result = findMany(GET_ALL_RATINGS_QUERY, parameterSource);
         log.debug("Получена коллекция всех рейтингов размеров {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень сервиса");
@@ -79,7 +85,11 @@ public class MpaDbStorage extends BaseDbStorage<Mpa> implements MpaStorage {
         log.debug("Поиск рейтинга по id на уровне хранилища");
         log.debug("Идентификатор запрашиваемого рейтинга: {}", ratingId);
 
-        Optional<Mpa> result = findOne(GET_RATING_BY_ID_QUERY, ratingId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("ratingId", ratingId);
+
+        Optional<Mpa> result = findOne(GET_RATING_BY_ID_QUERY, parameterSource);
 
         log.debug("Возврат результата поиска на уровень сервиса");
         return result;

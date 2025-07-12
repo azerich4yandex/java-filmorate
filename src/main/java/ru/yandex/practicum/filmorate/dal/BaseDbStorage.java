@@ -69,25 +69,7 @@ public class BaseDbStorage<T> {
         return isRecordInserted;
     }
 
-    protected Collection<T> findMany(String query, Object... params) {
-        log.debug("Начало операции поиска коллекции");
-
-        log.trace("Вызов findMany(). SQL : {}  с параметрами {}", query, params);
-
-        Collection<T> result = jdbcTemplate.query(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        }, mapper);
-
-        log.debug("Операция поиска коллекции завершена");
-        return result;
-    }
-
-    protected Collection<T> findManyParametrized(String query, MapSqlParameterSource params) {
+    protected Collection<T> findMany(String query, MapSqlParameterSource params) {
         log.debug("Начало вызова поиска коллекции с именованными переменными");
         Collection<T> result = namedJdbcTemplate.query(query, params, mapper);
 
@@ -95,25 +77,22 @@ public class BaseDbStorage<T> {
         return result;
     }
 
-    protected Optional<T> findOne(String query, Object... params) {
-        log.debug("Начало операции поиска экземпляра");
+    protected Optional<T> findOne(String query, MapSqlParameterSource params) {
+        log.debug("Начало вызова поиск экземпляра с именованными переменными");
 
-        log.trace("Вызов findOne(). SQL : {}  с параметрами {}", query, params);
+        T result;
 
-        Collection<T> resultSet = jdbcTemplate.query(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
+        try {
+            result = namedJdbcTemplate.queryForObject(query, params, mapper);
+        } catch (DataAccessException ignored) {
+            result = null;
+        }
 
-            return ps;
-        }, mapper);
-
-        log.debug("Операция поиска экземпляра завершена");
-        if (resultSet.isEmpty()) {
-            return Optional.empty();
+        log.debug("Операция поиска экземпляра с именованными параметрами завершена");
+        if (result != null) {
+            return Optional.of(result);
         } else {
-            return resultSet.stream().findFirst();
+            return Optional.empty();
         }
     }
 
