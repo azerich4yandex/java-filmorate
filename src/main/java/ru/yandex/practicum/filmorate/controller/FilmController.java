@@ -22,10 +22,10 @@ import ru.yandex.practicum.filmorate.service.FilmService;
 /**
  * Контроллер для обработки HTTP-запросов для /films
  */
-@Slf4j
-@RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/films")
+@RestController
 public class FilmController {
 
     private final FilmService filmService;

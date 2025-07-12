@@ -397,24 +397,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     }
 
     @Override
-    public void addRating(Long filmId, Long ratingId) {
-        log.debug("Установка рейтинга фильму на уровне хранилища");
-        log.debug("Идентификатор переданного фильма: {}", filmId);
-        log.debug("Идентификатор переданного жанра: {}", ratingId);
-
-        if (!exists(GET_RATING_ID_ON_FILM_QUERY, filmId, ratingId)) {
-            long updatedRows = update(INSERT_RATING_ON_FILM_QUERY, ratingId, filmId);
-            log.debug("На уровне хранилища обновлено  {} запись(ей)", updatedRows);
-
-            log.debug("Фильму с id {} присвоен рейтинг с id {}", filmId, ratingId);
-        } else {
-            log.debug("Рейтинг не будет установлен фильму, т.к. уже установлен");
-        }
-
-        log.debug("Возврат результата установки на уровень сервиса");
-    }
-
-    @Override
     public void removeRating(Long filmId) {
         log.debug("Удаление рейтинга с фильма на уровне хранилища");
         log.debug("Передан id изменяемого фильма: {}", filmId);

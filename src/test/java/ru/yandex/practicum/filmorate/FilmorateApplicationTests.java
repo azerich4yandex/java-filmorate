@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 @RequiredArgsConstructor(onConstructor_ = @Autowired)
 class FilmorateApplicationTests {
 
-    @DisplayName("Проверка загрузки контекста")
+    @DisplayName("Контекст: Проверка загрузки")
     @Test
     void contextLoads() {
 
