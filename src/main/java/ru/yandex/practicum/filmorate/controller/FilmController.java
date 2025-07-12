@@ -70,15 +70,19 @@ public class FilmController {
     }
 
     /**
-     * Обработка GET-запроса для /films/popular?count={count}
+     * Обработка GET-запроса для /films/popular?count={limit}&genreId={genreId}&year={year}
      */
     @GetMapping("/popular")
     public ResponseEntity<Collection<FilmDto>> findPopular(
-            @RequestParam(name = "count", required = false, defaultValue = "10") Integer count) {
+            @RequestParam(name = "count", required = false, defaultValue = "10") Integer limit,
+            @RequestParam(name = "genreId", required = false) Long genreId,
+            @RequestParam(name = "year", required = false) Integer year) {
         log.info("Поиск топ фильмов на уровне контроллера");
-        log.debug("Передано значение count = {}", count);
+        log.debug("Передано значение limit = {}", limit);
+        log.debug("Передано значение genreId = {}", genreId == null ? "null" : genreId);
+        log.debug("Передано значение year = {}", year == null ? "null" : year);
 
-        Collection<FilmDto> result = filmService.findPopular(count);
+        Collection<FilmDto> result = filmService.findPopular(limit, genreId, year);
         log.debug("На уровень контроллера вернулась коллекция топ-фильмов размером {}", result.size());
 
         log.info("Возвращение топ фильмов на уровень клиента");

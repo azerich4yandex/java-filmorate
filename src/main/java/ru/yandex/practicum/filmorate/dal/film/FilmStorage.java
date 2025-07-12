@@ -27,7 +27,7 @@ public interface FilmStorage {
      * @param count размер коллекции
      * @return коллекция популярных фильмов указанного размера
      */
-    Collection<Film> findPopular(Integer count);
+    Collection<Film> findPopular(Integer count, Long genreId, Integer year);
 
     /**
      * Метод возвращает коллекцию фильмов с таким же жанром
@@ -65,7 +65,6 @@ public interface FilmStorage {
      * Метод обновляет в хранилище переданный экземпляр класса {@link Film}
      *
      * @param newFilm экземпляр класса {@link Film} для обновления
-     * @return обновленный экземпляр класса {@link Film} из хранилища
      */
     void updateFilm(Film newFilm);
 
@@ -100,14 +99,6 @@ public interface FilmStorage {
      * @param genreId идентификатор жанра
      */
     void removeGenre(Long filmId, Long genreId);
-
-    /**
-     * Метод добавляет фильму переданный рейтинг
-     *
-     * @param filmId идентификатор фильма
-     * @param ratingId идентификатор рейтинга
-     */
-    void addRating(Long filmId, Long ratingId);
 
     /**
      * Метод удаляет с фильма переданный рейтинг

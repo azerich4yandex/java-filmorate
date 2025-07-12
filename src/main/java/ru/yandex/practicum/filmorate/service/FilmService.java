@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import jakarta.validation.ValidationException;
 import java.time.LocalDate;
+import java.time.Year;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Comparator;
@@ -79,18 +80,34 @@ public class FilmService {
      * @return результирующая коллекция
      * @throws ValidationException если передано пустой размер возвращаемой коллекции
      */
-    public Collection<FilmDto> findPopular(Integer count) throws ValidationException {
+    public Collection<FilmDto> findPopular(Integer count, Long genreId, Integer year) throws ValidationException {
         log.debug("Поиск топ фильмов на уровне сервиса");
-
-        // Если аннотация в параметре контроллера была проигнорирована (запуск тестов напрямую без Mock)
-        count = count == null ? 10 : count;
 
         // Если передано отрицательное значение
         if (count <= 0) {
             throw new ValidationException("Значение count должно быть больше нуля");
         }
 
-        Collection<Film> searchResult = filmStorage.findPopular(count);
+        // Жанр должен существовать, если указан
+        if (genreId != null) {
+            Genre genre = genreStorage.findById(genreId)
+                    .orElseThrow(() -> new NotFoundException("Жанр с id " + genreId + " не найден"));
+            log.debug("Для поиска топ-фильмов указан жанр с id {}", genre.getId());
+        } else {
+            log.debug("Жанр для поиска топ-фильмов не указан");
+        }
+
+        // Год должен быть в рамках диапазона, если указан
+        if (year != null) {
+            if (year < 1895 || year > Year.now().getValue()) {
+                throw new ValidationException("Передан некорректный год: " + year);
+            }
+            log.debug("Для поиска топ-фильмов указан год {}", year);
+        } else {
+            log.debug("Год для поиска топ-фильмов не указан");
+        }
+
+        Collection<Film> searchResult = filmStorage.findPopular(count, genreId, year);
         log.debug("Получена коллекция топ-фильмов размером {}", searchResult.size());
 
         Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
