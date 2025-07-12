@@ -5,6 +5,8 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.model.Genre;
@@ -18,22 +20,22 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
                    g.FULL_NAME
               FROM GENRES g
              ORDER BY g.ID
-             LIMIT ?
-            OFFSET ?
+             LIMIT :size
+            OFFSET :from
             """;
     private static final String GET_GENRES_BY_FILM_ID_QUERY = """
             SELECT g.ID,
                    g.FULL_NAME
               FROM FILMS_GENRES fg
              INNER JOIN GENRES g on fg.GENRE_ID = g.ID
-             WHERE fg.FILM_ID = ?
+             WHERE fg.FILM_ID = :filmId
              ORDER BY g.ID
             """;
     private static final String GET_GENRE_BY_ID_QUERY = """
             SELECT g.ID,
                    g.FULL_NAME
               FROM GENRES g
-             WHERE g.ID = ?
+             WHERE g.ID = :genreId
             """;
     private static final String INSERT_GENRE_QUERY = """
             INSERT INTO GENRES (FULL_NAME)
@@ -65,8 +67,9 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
             """;
 
     @Autowired
-    public GenreDbStorage(JdbcTemplate jdbcTemplate, GenreRowMapper genreRowMapper) {
-        super(jdbcTemplate, genreRowMapper);
+    public GenreDbStorage(JdbcTemplate jdbcTemplate, GenreRowMapper genreRowMapper,
+                          NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, genreRowMapper);
     }
 
     @Override
@@ -75,7 +78,12 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
         log.debug("Размер запрашиваемой коллекции: {}", size);
         log.debug("Номер стартового элемента: {}", from);
 
-        Collection<Genre> result = findMany(GET_ALL_GENRES_QUERY, size, from);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("size", size)
+                .addValue("from", from);
+
+        Collection<Genre> result = findMany(GET_ALL_GENRES_QUERY, parameterSource);
         log.debug("Получена коллекция всех жанров размером {}", result.size());
 
         log.debug("Возврат результатов поиска на уровень сервиса");
@@ -87,7 +95,11 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
         log.debug("Запрос жанров по идентификатору фильма на уровне хранилища");
         log.debug("Идентификатор запрашиваемого фильма: {}", filmId);
 
-        Collection<Genre> result = findMany(GET_GENRES_BY_FILM_ID_QUERY, filmId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId);
+
+        Collection<Genre> result = findMany(GET_GENRES_BY_FILM_ID_QUERY, parameterSource);
         log.debug("Получена коллекция размером {}", result.size());
 
         log.debug("Возврат результатов на уровень сервиса");
@@ -99,7 +111,11 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
         log.debug("Поиск жанра по id на уровне хранилища");
         log.debug("Идентификатор запрашиваемого жанра: {}", genreId);
 
-        Optional<Genre> result = findOne(GET_GENRE_BY_ID_QUERY, genreId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("genreId", genreId);
+
+        Optional<Genre> result = findOne(GET_GENRE_BY_ID_QUERY, parameterSource);
 
         log.debug("Возврат результата поиска на уровень сервиса");
         return result;
