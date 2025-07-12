@@ -6,6 +6,8 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
 import ru.yandex.practicum.filmorate.model.User;
@@ -22,8 +24,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.BIRTHDAY
               FROM USERS u
              ORDER BY u.ID
-             LIMIT ?
-            OFFSET ?
+             LIMIT :size
+            OFFSET :from
             """;
     private static final String GET_ALL_USER_FRIENDS_QUERY = """
             SELECT u.ID,
@@ -33,7 +35,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.BIRTHDAY
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
-             WHERE f.USER_ID = ?
+             WHERE f.USER_ID = :userId
             """;
     private static final String GET_ALL_COMMON_FRIENDS_QUERY = """
             SELECT u.ID,
@@ -43,7 +45,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.BIRTHDAY
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
-             WHERE f.USER_ID = ?
+             WHERE f.USER_ID = :userId
             INTERSECT
             SELECT u.ID,
                    u.EMAIL,
@@ -52,7 +54,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.BIRTHDAY
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
-             WHERE f.USER_ID = ?
+             WHERE f.USER_ID = :friendId
             """;
     private static final String GET_ALL_USERS_BY_FILM_ID_QUERY = """
             SELECT u.ID,
@@ -62,7 +64,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.BIRTHDAY
               FROM USERS_FILMS uf
              INNER JOIN USERS u ON uf.USER_ID = u.ID
-             WHERE uf.FILM_ID = ?
+             WHERE uf.FILM_ID = :filmId
              ORDER BY u.ID
             """;
     private static final String GET_USER_BY_ID_QUERY = """
@@ -72,7 +74,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.FULL_NAME,
                    u.BIRTHDAY
               FROM USERS u
-             WHERE u.ID = ?
+             WHERE u.ID = :userId
             """;
     private static final String INSERT_USER_QUERY = """
             INSERT INTO USERS (EMAIL, LOGIN, FULL_NAME, BIRTHDAY)
@@ -132,8 +134,9 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
             """;
 
     @Autowired
-    public UserDbStorage(JdbcTemplate jdbcTemplate, UserRowMapper userRowMapper) {
-        super(jdbcTemplate, userRowMapper);
+    public UserDbStorage(JdbcTemplate jdbcTemplate, UserRowMapper userRowMapper,
+                         NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        super(jdbcTemplate, namedParameterJdbcTemplate, userRowMapper);
     }
 
     @Override
@@ -142,8 +145,13 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Размер запрашиваемой коллекции: {}", size);
         log.debug("Номер стартового элемента: {}", from);
 
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("size", size)
+                .addValue("from", from);
+
         // Получаем коллекцию всех пользователей
-        Collection<User> result = findMany(GET_ALL_USERS_QUERY, size, from);
+        Collection<User> result = findMany(GET_ALL_USERS_QUERY, parameterSource);
         log.debug("Получена коллекция всех пользователей размером {}", result.size());
 
         // Возвращаем результат
@@ -155,7 +163,11 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
     public Collection<User> findByFilmId(Long filmId) {
         log.debug("Запрос лайков на уровне хранилища");
 
-        Collection<User> result = findMany(GET_ALL_USERS_BY_FILM_ID_QUERY, filmId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId);
+
+        Collection<User> result = findMany(GET_ALL_USERS_BY_FILM_ID_QUERY, parameterSource);
         log.debug("Получена коллекция пользователей размером {}", result.size());
 
         log.debug("Возврат лайков на уровень сервиса");
@@ -167,7 +179,11 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Запрос друзей на уровне хранилища");
         log.debug("Идентификатор пользователя: {}", userId);
 
-        Collection<User> result = findMany(GET_ALL_USER_FRIENDS_QUERY, userId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId);
+
+        Collection<User> result = findMany(GET_ALL_USER_FRIENDS_QUERY, parameterSource);
         log.debug("Получена коллекция идентификатором пользователей размером {}", result.size());
 
         log.debug("Возврат результатов поиска друзей на уровень сервиса");
@@ -181,7 +197,12 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Идентификатор первого пользователя: {}", userId);
         log.debug("Идентификатор второго пользователя: {}", friendId);
 
-        Collection<User> result = findMany(GET_ALL_COMMON_FRIENDS_QUERY, userId, friendId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("friendId", friendId);
+
+        Collection<User> result = findMany(GET_ALL_COMMON_FRIENDS_QUERY, parameterSource);
         log.debug("Получена коллекция размером {}", result.size());
 
         log.debug("Возврат результатов поиска общих друзей на уровень сервиса");
@@ -193,7 +214,11 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Поиск пользователя по id на уровне хранилища");
         log.debug("Идентификатор искомого пользователя: {}", userId);
 
-        Optional<User> result = findOne(GET_USER_BY_ID_QUERY, userId);
+        // Составляем набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId);
+
+        Optional<User> result = findOne(GET_USER_BY_ID_QUERY, parameterSource);
 
         log.debug("Возврат результата поиска на уровень сервиса");
         return result;
