@@ -104,7 +104,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
             """;
     private static final String DELETE_USER_QUERY = """
             DELETE FROM USERS
-             WHERE ID = ?
+             WHERE ID = :userId
             """;
     private static final String DELETE_ALL_FILMS = """
             DELETE FROM USERS
