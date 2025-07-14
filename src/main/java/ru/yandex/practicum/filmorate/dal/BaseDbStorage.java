@@ -1,14 +1,11 @@
 package ru.yandex.practicum.filmorate.dal;
 
-import java.sql.PreparedStatement;
-import java.sql.Statement;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -18,60 +15,40 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 @RequiredArgsConstructor
 public class BaseDbStorage<T> {
 
-    protected final JdbcTemplate jdbcTemplate;
-    protected final NamedParameterJdbcTemplate namedJdbcTemplate;
+    protected final NamedParameterJdbcTemplate jdbcTemplate;
     protected final RowMapper<T> mapper;
 
-    protected long insert(String query, Object... params) {
-        log.debug("Начало операции вставки данных");
-
-        log.trace("Вызов insert(). SQL : {}  с параметрами {}", query, Arrays.toString(params));
+    protected long insert(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции вставки данных с именованными параметрами");
 
         GeneratedKeyHolder keyHolder = new GeneratedKeyHolder();
 
-        jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        }, keyHolder);
+        jdbcTemplate.update(query, params, keyHolder);
 
         Number id = keyHolder.getKey();
 
-        log.debug("Операция вставки данных завершена");
+        log.debug("Операция вставки данных с именованными параметрами завершена");
         return id != null ? id.longValue() : 0L;
     }
 
-    protected boolean insertWithOutReturnId(String query, Object... params) {
-        log.debug("Начало операции вставки данных без возврата ключа");
+    protected boolean insertWithOutReturnId(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции вставки данных без возврата ключа с именованными параметрами");
 
-        boolean isRecordInserted;
-
-        log.trace("Вызов insertWithOutReturnId(). SQL : {}  с параметрами {}", query, Arrays.toString(params));
+        long insertedRecords;
 
         try {
-            jdbcTemplate.update(connection -> {
-                PreparedStatement ps = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
-                for (int idx = 0; idx < params.length; idx++) {
-                    ps.setObject(idx + 1, params[idx]);
-                }
-
-                return ps;
-            });
-            isRecordInserted = true;
+            insertedRecords = jdbcTemplate.update(query, params);
         } catch (DataAccessException ignored) {
-            isRecordInserted = false;
+            insertedRecords = 0;
         }
 
-        log.debug("Операция вставки данных без возврата ключа завершена");
-        return isRecordInserted;
+        log.debug("Операция вставки данных без возврата ключа с именованными параметрами завершена");
+        return insertedRecords == 1;
     }
 
     protected Collection<T> findMany(String query, MapSqlParameterSource params) {
         log.debug("Начало вызова поиска коллекции с именованными переменными");
-        Collection<T> result = namedJdbcTemplate.query(query, params, mapper);
+        Collection<T> result = jdbcTemplate.query(query, params, mapper);
 
         log.debug("Операция поиска коллекции с именованными параметрами завершена");
         return result;
@@ -83,7 +60,7 @@ public class BaseDbStorage<T> {
         T result;
 
         try {
-            result = namedJdbcTemplate.queryForObject(query, params, mapper);
+            result = jdbcTemplate.queryForObject(query, params, mapper);
         } catch (DataAccessException ignored) {
             result = null;
         }
@@ -96,77 +73,44 @@ public class BaseDbStorage<T> {
         }
     }
 
-    protected boolean exists(String query, Object... params) {
-        log.debug("Начало операции проверки наличия сущности");
+    protected boolean exists(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции проверки сущностей с именованными параметрами");
 
-        log.trace("Вызов exists(). SQL : {}  с параметрами {}", query, params);
+        Collection<T> resultSet;
+        try {
+            resultSet = jdbcTemplate.query(query, params, mapper);
+        } catch (DataAccessException ignored) {
+            resultSet = new ArrayList<>();
+        }
 
-        Collection<Long> resultSet = jdbcTemplate.query(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        }, (rs, rowNum) -> rs.getLong("id"));
-
-        log.debug("Операция проверки наличия завершена");
-
-        return !(resultSet.isEmpty());
-
+        log.debug("Операция проверки наличия сущностей с именованными параметрами завершена");
+        return !resultSet.isEmpty();
     }
 
-    protected long update(String query, Object... params) {
-        log.debug("Начало операции изменения");
+    protected long update(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции изменения с именованными параметрами");
 
-        log.debug("Вызов updateFilm(). SQL : {}  с параметрами {}", query, params);
+        long result = jdbcTemplate.update(query, params);
 
-        long result = jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        });
-
-        log.debug("Операция изменения завершена");
+        log.debug("Операция изменения с именованными параметрами завершена");
         return result;
     }
 
-    protected long deleteOne(String query, Object... params) {
-        log.debug("Начало операции удаления экземпляра");
+    protected long deleteOne(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции удаления с именованными параметрами");
 
-        log.debug("Вызов deleteOne(). SQL : {}  с параметрами {}", query, params);
+        long result = jdbcTemplate.update(query, params);
 
-        long result = jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        });
-
-        log.debug("Операция удаления экземпляра завершена");
+        log.debug("Операция удаления с именованными параметрами завершена");
         return result;
     }
 
-    protected long deleteMany(String query, Object... params) {
-        log.debug("Начало операции массового удаления");
+    protected long deleteMany(String query, MapSqlParameterSource params) {
+        log.debug("Начало операции массового удаления с именованными параметрами");
 
-        log.debug("Вызов deleteMany(). SQL : {}  с параметрами {}", query, params);
+        long result = jdbcTemplate.update(query, params);
 
-        long result = jdbcTemplate.update(connection -> {
-            PreparedStatement ps = connection.prepareStatement(query);
-            for (int idx = 0; idx < params.length; idx++) {
-                ps.setObject(idx + 1, params[idx]);
-            }
-
-            return ps;
-        });
-
-        log.debug("Операция массового удаления завершена");
+        log.debug("Операция массового удаления с именованными параметрами завершена");
         return result;
     }
 }

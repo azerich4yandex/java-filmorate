@@ -309,8 +309,8 @@ public class UserService {
         // Если все пользователи успешно получены
         if (user != null && friend != null) {
             // Удаляем из друзей пользователя друга
-            log.debug("Удаляем друга с id {} из друзей пользователя с id {}", friendId, userId);
-            userStorage.removeFriend(userId, friendId);
+            log.debug("Удаляем друга с id {} из друзей пользователя с id {}", friend.getId(), user.getId());
+            userStorage.removeFriend(user.getId(), friend.getId());
         } else {
             throw new RuntimeException("Во время удаления из друзей произошла непредвиденная ошибка");
         }
