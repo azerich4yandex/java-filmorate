@@ -35,6 +35,8 @@ public interface FilmStorage {
      * Метод возвращает коллекцию популярных фильмов
      *
      * @param count размер коллекции
+     * @param genreId идентификатор жанра
+     * @param year год выпуска
      * @return коллекция популярных фильмов указанного размера
      */
     Collection<Film> findPopular(Integer count, Long genreId, Integer year);
