@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal.film;
 
+import java.sql.Types;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -65,21 +66,14 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    r.FULL_NAME AS rating_name,
                    COUNT(uf.ID) AS cnt
               FROM FILMS f
-              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
-             INNER JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
-             WHERE (YEAR(f.RELEASE_DATE) = :year OR :year IS NULL)
-               AND EXISTS (SELECT 1
-               		         FROM FILMS_GENRES fg
-               		        WHERE fg.FILM_ID = f.ID
-               		          AND (fg.GENRE_ID = :genreId OR :genreId IS NULL))
-             GROUP BY f.ID,
-                      f.FULL_NAME,
-                      f.DESCRIPTION,
-                      f.DURATION,
-                      f.RELEASE_DATE,
-                      f.RATING_ID,
-                      r.FULL_NAME
-             ORDER BY 8 DESC
+             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
+              LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+              LEFT JOIN FILMS_GENRES fg ON f.ID = fg.FILM_ID
+              LEFT JOIN GENRES g ON fg.GENRE_ID = g.ID
+             WHERE (:genreId IS NULL OR g.ID = :genreId)
+               AND (:year IS NULL OR YEAR(f.RELEASE_DATE) = :year)
+             GROUP BY f.ID, r.ID
+             ORDER BY CNT  DESC
              LIMIT :count
             """;
     private static final String GET_ALL_FILMS_BY_GENRE_QUERY = """
@@ -207,8 +201,9 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Номер стартового элемента: {}", from);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("size", size)
-                .addValue("from", from);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("size", size, Types.BIGINT)
+                .addValue("from", from, Types.BIGINT);
 
         // Получаем коллекцию всех фильмов
         Collection<Film> result = findMany(GET_ALL_FILMS_QUERY, parameterSource);
@@ -226,8 +221,9 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Идентификатора второго пользователя: {}", friendId);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("userId", userId)
-                .addValue("friendId", friendId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId, Types.BIGINT)
+                .addValue("friendId", friendId, Types.BIGINT);
 
         // Получаем коллекцию общих фильмов
         Collection<Film> result = findMany(GET_COMMON_FILMS_QUERY, parameterSource);
@@ -245,8 +241,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Год релиза: {}", year == null ? "null" : year);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("count", count)
-                .addValue("year", year).addValue("genreId", genreId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("count", count, Types.BIGINT)
+                .addValue("year", year, Types.INTEGER)
+                .addValue("genreId", genreId, Types.BIGINT);
 
         // Получаем коллекцию популярных фильмов
         Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, parameterSource);
@@ -263,7 +261,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Идентификатор запрашиваемого жанра: {}", genreId);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("genreId", genreId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("genreId", genreId, Types.BIGINT);
 
         Collection<Film> result = findMany(GET_ALL_FILMS_BY_GENRE_QUERY, parameterSource);
         log.debug("Получена коллекция фильмов размером {}", result.size());
@@ -278,9 +277,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Идентификатор запрашиваемого рейтинга: {}", ratingId);
 
         // Составляем набор параметров
-        MapSqlParameterSource params = new MapSqlParameterSource().addValue("ratingId", ratingId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("ratingId", ratingId, Types.BIGINT);
 
-        Collection<Film> result = findMany(GET_ALL_FILMS_BY_RATING_QUERY, params);
+        Collection<Film> result = findMany(GET_ALL_FILMS_BY_RATING_QUERY, parameterSource);
         log.debug("Получена коллекция фильмов по жанру размером {}", result.size());
 
         log.debug("Возврат результатов поиска по рейтингу на уровень сервиса");
@@ -292,7 +292,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Поиск фильма по id на уровне хранилища");
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("filmId", filmId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId, Types.BIGINT);
 
         Optional<Film> searchResult = findOne(GET_FILM_BY_ID_QUERY, parameterSource);
         if (searchResult.isPresent()) {
@@ -313,11 +314,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         Long ratingId = film.getMpa() != null && film.getMpa().getId() != null ? film.getMpa().getId() : null;
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmName", film.getName())
-                .addValue("filmDescription", film.getDescription())
-                .addValue("filmReleaseDate", film.getReleaseDate())
-                .addValue("filmDuration", film.getDuration())
-                .addValue("ratingId", ratingId);
+                .addValue("filmName", film.getName(), Types.NVARCHAR)
+                .addValue("filmDescription", film.getDescription(), Types.NVARCHAR)
+                .addValue("filmReleaseDate", film.getReleaseDate(), Types.DATE)
+                .addValue("filmDuration", film.getDuration(), Types.INTEGER)
+                .addValue("ratingId", ratingId, Types.BIGINT);
 
         long id = insert(INSERT_FILM_QUERY, parameterSource);
 
@@ -343,12 +344,12 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         Long ratingId = newFilm.getMpa() != null && newFilm.getMpa().getId() != null ? newFilm.getMpa().getId() : null;
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmName", newFilm.getName())
-                .addValue("filmDescription", newFilm.getDescription())
-                .addValue("filmReleaseDate", newFilm.getReleaseDate())
-                .addValue("filmDuration", newFilm.getDuration())
-                .addValue("ratingId", ratingId)
-                .addValue("filmId", newFilm.getId());
+                .addValue("filmName", newFilm.getName(), Types.NVARCHAR)
+                .addValue("filmDescription", newFilm.getDescription(), Types.NVARCHAR)
+                .addValue("filmReleaseDate", newFilm.getReleaseDate(), Types.DATE)
+                .addValue("filmDuration", newFilm.getDuration(), Types.INTEGER)
+                .addValue("ratingId", ratingId, Types.BIGINT)
+                .addValue("filmId", newFilm.getId(), Types.BIGINT);
 
         long updatedRows = update(UPDATE_FILM_QUERY, parameterSource);
 
@@ -371,15 +372,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("userId", userId);
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("userId", userId, Types.BIGINT);
 
         if (!exists(GET_LIKE_ID_QUERY, parameterSource)) {
             log.debug("Лайк будет добавлен в БД");
-
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("userId", userId);
 
             boolean isInserted = insertWithOutReturnId(INSERT_LIKE_QUERY, parameterSource);
             if (!isInserted) {
@@ -403,15 +400,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("userId", userId);
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("userId", userId, Types.BIGINT);
 
         if (exists(GET_LIKE_ID_QUERY, parameterSource)) {
             log.debug("Лайк будет удалён из БД");
-
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("userId", userId);
 
             long deletedRows = deleteOne(DELETE_LIKE_QUERY, parameterSource);
 
@@ -435,15 +428,12 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Переданный идентификатор жанра: {}", genreId);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("filmId", filmId)
-                .addValue("genreId", genreId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("genreId", genreId, Types.BIGINT);
 
         if (!exists(GET_GENRE_AND_FILM_LINK_QUERY, parameterSource)) {
             log.debug("Жанр будет добавлен фильму");
-
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("genreId", genreId);
 
             boolean isInserted = insertWithOutReturnId(INSERT_GENRE_TO_FILM_QUERY, parameterSource);
             if (!isInserted) {
@@ -465,15 +455,12 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Переданный идентификатор удаляемого жанра: {}", genreId);
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("genreId", genreId);
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("genreId", genreId, Types.BIGINT);
 
         if (!exists(GET_GENRE_AND_FILM_LINK_QUERY, parameterSource)) {
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("genreId", genreId);
-
             long deletedRows = deleteOne(DELETE_GENRE_ON_FILM_QUERY, parameterSource);
+
             if (deletedRows == 0) {
                 throw new RuntimeException(
                         "Не удалось удалить связь жанра с id " + genreId + "и фильма с id " + filmId);
@@ -494,14 +481,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("ratingId", ratingId);
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("ratingId", ratingId, Types.BIGINT);
 
         if (!exists(GET_RATING_ID_ON_FILM_QUERY, parameterSource)) {
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("ratingId", ratingId);
-
             long updatedRows = update(INSERT_RATING_ON_FILM_QUERY, parameterSource);
 
             if (updatedRows == 0) {
@@ -524,7 +507,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Передан id изменяемого фильма: {}", filmId);
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId);
+                .addValue("filmId", filmId, Types.BIGINT);
 
         long updatedRows = update(REMOVE_RATING_FROM_FILM_QUERY, parameterSource);
 
@@ -544,7 +527,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Передан id фильма: {}", filmId);
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId);
+                .addValue("filmId", filmId, Types.BIGINT);
 
         long deletedRows = deleteOne(DELETE_FILM_BY_ID_QUERY, parameterSource);
 
