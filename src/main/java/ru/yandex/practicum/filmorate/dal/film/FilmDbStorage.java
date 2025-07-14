@@ -57,29 +57,22 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             """;
     private static final String GET_POPULAR_FILMS_QUERY = """
             SELECT f.ID,
-                   f.FULL_NAME,
-                   f.DESCRIPTION,
-                   f.DURATION,
-                   f.RELEASE_DATE,
-                   f.RATING_ID,
-                   r.FULL_NAME AS rating_name,
-                   COUNT(uf.ID) AS cnt
+            	   f.FULL_NAME,
+            	   f.DESCRIPTION,
+            	   f.DURATION,
+            	   f.RELEASE_DATE,
+            	   f.RATING_ID,
+            	   r.FULL_NAME AS rating_name,
+            	   COUNT(uf.ID) AS cnt
               FROM FILMS f
-              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
-             INNER JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
-             WHERE (YEAR(f.RELEASE_DATE) = :year OR :year IS NULL)
-               AND EXISTS (SELECT 1
-               		         FROM FILMS_GENRES fg
-               		        WHERE fg.FILM_ID = f.ID
-               		          AND (fg.GENRE_ID = :genreId OR :genreId IS NULL))
-             GROUP BY f.ID,
-                      f.FULL_NAME,
-                      f.DESCRIPTION,
-                      f.DURATION,
-                      f.RELEASE_DATE,
-                      f.RATING_ID,
-                      r.FULL_NAME
-             ORDER BY 8 DESC
+             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
+              LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+              LEFT JOIN FILMS_GENRES fg ON f.ID = fg.FILM_ID
+              LEFT JOIN GENRES g ON fg.GENRE_ID = g.ID
+             WHERE (:genreId IS NULL OR g.ID = :genreId)
+               AND (:year IS NULL OR YEAR(f.RELEASE_DATE) = :year)
+             GROUP BY f.ID, r.ID
+             ORDER BY CNT  DESC
              LIMIT :count
             """;
     private static final String GET_ALL_FILMS_BY_GENRE_QUERY = """
