@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal.genre;
 
+import java.sql.Types;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -95,7 +96,7 @@ public class GenreDbStorage extends BaseDbStorage<Genre> implements GenreStorage
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId);
+                .addValue("filmId", filmId, Types.BIGINT);
 
         Collection<Genre> result = findMany(GET_GENRES_BY_FILM_ID_QUERY, parameterSource);
         log.debug("Получена коллекция размером {}", result.size());
