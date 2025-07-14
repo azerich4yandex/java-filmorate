@@ -21,6 +21,16 @@ public interface FilmStorage {
      */
     Collection<Film> findAll(Integer size, Integer from);
 
+
+    /**
+     * Метод возвращает коллекцию общих для двух пользователей фильмов
+     *
+     * @param userId идентификатор первого пользователя
+     * @param friendId идентификатор второго пользователя
+     * @return коллекция {@link Film}
+     */
+    Collection<Film> findCommon(Long userId, Long friendId);
+
     /**
      * Метод возвращает коллекцию популярных фильмов
      *

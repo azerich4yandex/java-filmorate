@@ -2,12 +2,10 @@ package ru.yandex.practicum.filmorate.dal;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -78,21 +76,15 @@ public class BaseDbStorage<T> {
     protected boolean exists(String query, MapSqlParameterSource params) {
         log.debug("Начало операции проверки сущностей с именованными параметрами");
 
-        Collection<Long> resultSet;
+        Collection<T> resultSet;
         try {
-            resultSet = jdbcTemplate.query(query, params, (ResultSetExtractor<Collection<Long>>) rs -> {
-                List<Long> result = new ArrayList<>();
-                while (rs.next()) {
-                    result.add(rs.getLong("id"));
-                }
-                return result;
-            });
+            resultSet = jdbcTemplate.query(query, params, mapper);
         } catch (DataAccessException ignored) {
             resultSet = new ArrayList<>();
         }
 
         log.debug("Операция проверки наличия сущностей с именованными параметрами завершена");
-        return resultSet != null && !resultSet.isEmpty();
+        return !resultSet.isEmpty();
     }
 
     protected long update(String query, MapSqlParameterSource params) {

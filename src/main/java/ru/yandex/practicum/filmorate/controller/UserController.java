@@ -14,11 +14,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
+import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
+import ru.yandex.practicum.filmorate.dto.user.UserDto;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
-import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
-import ru.yandex.practicum.filmorate.dto.user.UserDto;
-import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 
 /**
  * Контроллер для обработки HTTP-запросов для "/users"
@@ -160,18 +160,19 @@ public class UserController {
     }
 
     /**
-     * Обработка DELETE-запроса для /users/{id}/friends/{friendId}
+     * Обработка DELETE-запроса для /users/{userId}/friends/{friendId}
      *
-     * @param id идентификатор пользователя
+     * @param userId идентификатор пользователя
      * @param friendId идентификатор друга
      */
-    @DeleteMapping("/{id}/friends/{friendId}")
-    public ResponseEntity<Void> removeFriend(@PathVariable Long id, @PathVariable Long friendId) {
+    @DeleteMapping("/{userId}/friends/{friendId}")
+    public ResponseEntity<Void> removeFriend(@PathVariable(name = "userId") Long userId,
+                                             @PathVariable(name = "friendId") Long friendId) {
         log.info("Запрошено удаление из друзей");
-        log.debug("Передан id  пользователя: {}", id);
-        log.debug("Передан id  друга: {}", friendId);
+        log.debug("Передан userId  пользователя: {}", userId);
+        log.debug("Передан userId  друга: {}", friendId);
 
-        userService.removeFriend(id, friendId);
+        userService.removeFriend(userId, friendId);
 
         log.info("Возврат результата удаления друга на уровень клиента");
         return new ResponseEntity<>(HttpStatus.OK);

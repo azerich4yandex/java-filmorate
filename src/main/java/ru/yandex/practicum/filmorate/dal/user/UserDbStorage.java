@@ -1,11 +1,10 @@
 package ru.yandex.practicum.filmorate.dal.user;
 
-import java.sql.Date;
+import java.sql.Types;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -78,30 +77,30 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
             """;
     private static final String INSERT_USER_QUERY = """
             INSERT INTO USERS (EMAIL, LOGIN, FULL_NAME, BIRTHDAY)
-            VALUES(?, ?, ?, ?)
+            VALUES(:userEMail, :userLogin, :userName, :userBirthday)
             """;
     private static final String UPDATE_USER_QUERY = """
             UPDATE USERS
-               SET EMAIL = ?,
-                   LOGIN = ?,
-                   FULL_NAME = ?,
-                   BIRTHDAY = ?
-             WHERE ID = ?
+               SET EMAIL = :userEMail,
+                   LOGIN = :userLogin,
+                   FULL_NAME = :userName,
+                   BIRTHDAY = :userBirthday
+             WHERE ID = :userId
             """;
     private static final String GET_FRIENDSHIP_ID_QUERY = """
             SELECT 1 AS ID
               FROM FRIENDS f
-             WHERE f.USER_ID = ?
-               AND f.OTHER_ID = ?
+             WHERE f.USER_ID = :userId
+               AND f.OTHER_ID = :friendId
             """;
     private static final String INSERT_FRIENDSHIP_QUERY = """
             INSERT INTO FRIENDS (USER_ID, OTHER_ID)
-            VALUES (?, ?)
+            VALUES (:userId, :friendId)
             """;
     private static final String DELETE_LINK_BETWEEN_USERS_QUERY = """
-            DELETE FROM FRIENDS
-             WHERE USER_ID = ?
-               AND OTHER_ID = ?
+            DELETE FROM FRIENDS f
+             WHERE f.USER_ID = :userId
+               AND f.OTHER_ID = :friendId
             """;
     private static final String DELETE_USER_QUERY = """
             DELETE FROM USERS
@@ -113,30 +112,29 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
     private static final String GET_EMAIL_BEFORE_UPDATE_QUERY = """
             SELECT u.ID
               FROM USERS u
-             WHERE UPPER(u.EMAIL) = ?
-               AND u.ID != ?
+             WHERE UPPER(u.EMAIL) = :userEMail
+               AND u.ID != :userId
             """;
     private static final String GET_EMAIL_BEFORE_INSERT_QUERY = """
             SELECT u.ID
               FROM USERS u
-             WHERE UPPER(u.EMAIL) = ?
+             WHERE UPPER(u.EMAIL) = :userEMail
             """;
     private static final String GET_LOGIN_BEFORE_UPDATE_QUERY = """
             SELECT u.ID
               FROM USERS u
-             WHERE UPPER(u.LOGIN) = ?
-               AND u.ID != ?
+             WHERE UPPER(u.LOGIN) = :userLogin
+               AND u.ID != :userId
             """;
     private static final String GET_LOGIN_BEFORE_INSERT_QUERY = """
             SELECT u.ID
               FROM USERS u
-             WHERE UPPER(u.LOGIN) = ?
+             WHERE UPPER(u.LOGIN) = :userLogin
             """;
 
     @Autowired
-    public UserDbStorage(JdbcTemplate jdbcTemplate, UserRowMapper userRowMapper,
-                         NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
-        super(jdbcTemplate, namedParameterJdbcTemplate, userRowMapper);
+    public UserDbStorage(NamedParameterJdbcTemplate jdbcTemplate, UserRowMapper userRowMapper) {
+        super(jdbcTemplate, userRowMapper);
     }
 
     @Override
@@ -147,8 +145,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("size", size)
-                .addValue("from", from);
+                .addValue("size", size, Types.BIGINT)
+                .addValue("from", from, Types.BIGINT);
 
         // Получаем коллекцию всех пользователей
         Collection<User> result = findMany(GET_ALL_USERS_QUERY, parameterSource);
@@ -165,7 +163,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId);
+                .addValue("filmId", filmId, Types.BIGINT);
 
         Collection<User> result = findMany(GET_ALL_USERS_BY_FILM_ID_QUERY, parameterSource);
         log.debug("Получена коллекция пользователей размером {}", result.size());
@@ -181,7 +179,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("userId", userId);
+                .addValue("userId", userId, Types.BIGINT);
 
         Collection<User> result = findMany(GET_ALL_USER_FRIENDS_QUERY, parameterSource);
         log.debug("Получена коллекция идентификатором пользователей размером {}", result.size());
@@ -199,8 +197,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("userId", userId)
-                .addValue("friendId", friendId);
+                .addValue("userId", userId, Types.BIGINT)
+                .addValue("friendId", friendId, Types.BIGINT);
 
         Collection<User> result = findMany(GET_ALL_COMMON_FRIENDS_QUERY, parameterSource);
         log.debug("Получена коллекция размером {}", result.size());
@@ -216,7 +214,7 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("userId", userId);
+                .addValue("userId", userId, Types.BIGINT);
 
         Optional<User> result = findOne(GET_USER_BY_ID_QUERY, parameterSource);
 
@@ -228,12 +226,18 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
     public User createUser(User user) {
         log.debug("Создание пользователя на уровне хранилища");
 
-        long id = insert(INSERT_USER_QUERY, user.getEmail(), user.getLogin(), user.getName(),
-                Date.valueOf(user.getBirthday()));
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userEMail", user.getEmail(), Types.VARCHAR)
+                .addValue("userLogin", user.getLogin(), Types.VARCHAR)
+                .addValue("userName", user.getName(), Types.NVARCHAR)
+                .addValue("userBirthday", user.getBirthday(), Types.DATE);
+
+        long id = insert(INSERT_USER_QUERY, parameterSource);
         if (id == 0) {
             throw new RuntimeException("Не удалось добавить пользователя в БД");
+        } else {
+            log.debug("Сгенерировано значение {}", id);
         }
-        log.debug("Сгенерировано значение {}", id);
 
         user.setId(id);
         log.debug("Значение присвоено id присвоено пользователю");
@@ -246,8 +250,14 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
     public User updateUser(User newUser) {
         log.debug("Изменение фильма на уровне хранилища");
 
-        long updatedRows = update(UPDATE_USER_QUERY, newUser.getEmail(), newUser.getLogin(), newUser.getName(),
-                newUser.getBirthday(), newUser.getId());
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userEMail", newUser.getEmail(), Types.VARCHAR)
+                .addValue("userLogin", newUser.getLogin(), Types.VARCHAR)
+                .addValue("userName", newUser.getName(), Types.NVARCHAR)
+                .addValue("userBirthday", newUser.getBirthday(), Types.DATE)
+                .addValue("userId", newUser.getId(), Types.BIGINT);
+
+        long updatedRows = update(UPDATE_USER_QUERY, parameterSource);
         log.debug("На уровне хранилища обновлено {} запись(ей)", updatedRows);
 
         propagateModel(newUser);
@@ -262,18 +272,24 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Идентификатор основного пользователя: {}", userId);
         log.debug("Идентификатор друга: {}", friendId);
 
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId, Types.BIGINT)
+                .addValue("friendId", friendId, Types.BIGINT);
+
         // Если ранее дружбы не было
-        if (!exists(GET_FRIENDSHIP_ID_QUERY, userId, friendId)) {
+        if (!exists(GET_FRIENDSHIP_ID_QUERY, parameterSource)) {
             log.debug("Дружба будет добавлена в БД");
+
             // Создаём её
-            boolean isInserted = insertWithOutReturnId(INSERT_FRIENDSHIP_QUERY, userId, friendId);
+            boolean isInserted = insertWithOutReturnId(INSERT_FRIENDSHIP_QUERY, parameterSource);
             if (!isInserted) {
                 throw new RuntimeException(
-                        "Не удалось добавить дружбу между пользователем с id " + userId + "  и пользователем с id "
+                        "Не удалось добавить пользователю с id " + userId + "  друга с id "
                                 + friendId);
+            } else {
+                log.debug("Пользователю с id {} добавлен друг с id {}", userId,
+                        friendId);
             }
-            log.debug("Добавлена новая дружба между пользователем с id {} и пользователем с id {}", userId,
-                    friendId);
         } else {
             log.debug("Дружба не будет добавлена в БД, т.к. уже существует");
         }
@@ -287,11 +303,15 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Идентификатор  основного пользователя: {}", userId);
         log.debug("Идентификатор  друга: {}", friendId);
 
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId, Types.BIGINT)
+                .addValue("friendId", friendId, Types.BIGINT);
+
         //Если дружба есть
-        if (exists(GET_FRIENDSHIP_ID_QUERY, userId, friendId)) {
+        if (exists(GET_FRIENDSHIP_ID_QUERY, parameterSource)) {
             log.debug("Дружба будет удалена из БД");
 
-            long deletedRows = deleteOne(DELETE_LINK_BETWEEN_USERS_QUERY, userId, friendId);
+            long deletedRows = deleteOne(DELETE_LINK_BETWEEN_USERS_QUERY, parameterSource);
 
             if (deletedRows == 0) {
                 throw new RuntimeException(
@@ -311,7 +331,10 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Удаление пользователя на уровне хранилища");
         log.debug("Передан id пользователя: {}", userId);
 
-        long deletedRows = deleteOne(DELETE_USER_QUERY, userId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId, Types.BIGINT);
+
+        long deletedRows = deleteOne(DELETE_USER_QUERY, parameterSource);
 
         if (deletedRows == 0) {
             throw new RuntimeException("Не удалось удалить пользователя с id " + userId);
@@ -325,7 +348,9 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
     public void clearUsers() {
         log.debug("Очистка хранилища пользователей");
 
-        long deletedRows = deleteMany(DELETE_ALL_FILMS);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource();
+
+        long deletedRows = deleteMany(DELETE_ALL_FILMS, parameterSource);
         log.debug("На уровне хранилища очищено {} запись(ей)", deletedRows);
 
         log.debug("Возврат результатов очистки на уровень сервиса");
@@ -336,9 +361,16 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Проверка на использование адреса {} другими пользователями", user.getEmail());
 
         if (user.getId() == null) {
-            return exists(GET_EMAIL_BEFORE_INSERT_QUERY, user.getEmail().toUpperCase());
+            MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                    .addValue("userEMail", user.getEmail().toUpperCase(), Types.VARCHAR);
+
+            return exists(GET_EMAIL_BEFORE_INSERT_QUERY, parameterSource);
         } else {
-            return exists(GET_EMAIL_BEFORE_UPDATE_QUERY, user.getEmail().toUpperCase(), user.getId());
+            MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                    .addValue("userEMail", user.getEmail().toUpperCase(), Types.VARCHAR)
+                    .addValue("userId", user.getId(), Types.BIGINT);
+
+            return exists(GET_EMAIL_BEFORE_UPDATE_QUERY, parameterSource);
         }
     }
 
@@ -347,11 +379,18 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
         log.debug("Проверка на использование логина {} другими пользователями", user.getLogin());
 
         if (user.getId() == null) {
+            MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                    .addValue("userLogin", user.getLogin().toUpperCase(), Types.VARCHAR);
+
             // Проверяем использование почты всеми пользователями
-            return exists(GET_LOGIN_BEFORE_INSERT_QUERY, user.getLogin().toUpperCase());
+            return exists(GET_LOGIN_BEFORE_INSERT_QUERY, parameterSource);
         } else {
+            MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                    .addValue("userLogin", user.getLogin().toUpperCase(), Types.VARCHAR)
+                    .addValue("userId", user.getId(), Types.BIGINT);
+
             // Проверяем использование почты другими пользователями
-            return exists(GET_LOGIN_BEFORE_UPDATE_QUERY, user.getLogin().toUpperCase(), user.getId());
+            return exists(GET_LOGIN_BEFORE_UPDATE_QUERY, parameterSource);
         }
     }
 

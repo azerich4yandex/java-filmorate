@@ -73,6 +73,31 @@ public class FilmService {
         return result;
     }
 
+    public Collection<FilmDto> findCommon(Long userId, Long friendId) {
+        log.debug("Поиск общих фильмов на уровне сервиса");
+
+        // Проверяем наличие пользователя
+        User user = userStorage.findById(userId).orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+
+        // Проверяем наличие друга
+        User friend = userStorage.findById(friendId).orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден"));
+
+        Collection<Film> searchResult = filmStorage.findCommon(user.getId(), friend.getId());
+        log.debug("Получена коллекция общих фильмов размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция общих фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
+
+        log.debug("Возврат коллекции общих фильмов на уровень контроллера");
+        return result;
+    }
+
     /**
      * Метод получает список из {@link FilmDto} на основе размера коллекции {@link FilmDto#getLikes()}
      *
