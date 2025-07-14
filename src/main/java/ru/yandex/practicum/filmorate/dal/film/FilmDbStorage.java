@@ -57,29 +57,22 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             """;
     private static final String GET_POPULAR_FILMS_QUERY = """
             SELECT f.ID,
-                   f.FULL_NAME,
-                   f.DESCRIPTION,
-                   f.DURATION,
-                   f.RELEASE_DATE,
-                   f.RATING_ID,
-                   r.FULL_NAME AS rating_name,
-                   COUNT(uf.ID) AS cnt
+            	   f.FULL_NAME,
+            	   f.DESCRIPTION,
+            	   f.DURATION,
+            	   f.RELEASE_DATE,
+            	   f.RATING_ID,
+            	   r.FULL_NAME AS rating_name,
+            	   COUNT(uf.ID) AS cnt
               FROM FILMS f
-              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
-             INNER JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
-             WHERE (YEAR(f.RELEASE_DATE) = :year OR :year IS NULL)
-               AND EXISTS (SELECT 1
-               		         FROM FILMS_GENRES fg
-               		        WHERE fg.FILM_ID = f.ID
-               		          AND (fg.GENRE_ID = :genreId OR :genreId IS NULL))
-             GROUP BY f.ID,
-                      f.FULL_NAME,
-                      f.DESCRIPTION,
-                      f.DURATION,
-                      f.RELEASE_DATE,
-                      f.RATING_ID,
-                      r.FULL_NAME
-             ORDER BY 8 DESC
+             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
+              LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+              LEFT JOIN FILMS_GENRES fg ON f.ID = fg.FILM_ID
+              LEFT JOIN GENRES g ON fg.GENRE_ID = g.ID
+             WHERE (:genreId IS NULL OR g.ID = :genreId)
+               AND (:year IS NULL OR YEAR(f.RELEASE_DATE) = :year)
+             GROUP BY f.ID, r.ID
+             ORDER BY CNT  DESC
              LIMIT :count
             """;
     private static final String GET_ALL_FILMS_BY_GENRE_QUERY = """
@@ -148,13 +141,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
              WHERE fg.FILM_ID = :filmId
                AND fg.GENRE_ID = :genreId
             """;
-    private static final String GET_RATING_ID_ON_FILM_QUERY = """
-            SELECT r.ID
-              FROM FILMS f
-             WHERE f.ID = :filmId
-              LEFT JOIN RATINGS r ON f.RATING_ID = r,ID
-               AND r.RATING_ID = :ratingId
-            """;
     private static final String INSERT_LIKE_QUERY = """
             INSERT INTO USERS_FILMS (FILM_ID, USER_ID)
             VALUES (:filmId, :userId)
@@ -162,11 +148,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     private static final String INSERT_GENRE_TO_FILM_QUERY = """
             INSERT INTO FILMS_GENRES (FILM_ID, GENRE_ID)
             VALUES (:filmId, :genreId)
-            """;
-    private static final String INSERT_RATING_ON_FILM_QUERY = """
-            UPDATE FILMS
-               SET RATING_ID = :ratingId
-             WHERE FILM_ID = :filmId
             """;
     private static final String DELETE_LIKE_QUERY = """
             DELETE FROM USERS_FILMS
@@ -484,38 +465,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         }
 
         log.debug("Возврат результата удаления жанра на уровень сервиса");
-    }
-
-    @Override
-    public void addRating(Long filmId, Long ratingId) {
-        log.debug("Установка рейтинга фильму на уровне хранилища");
-        log.debug("Идентификатор переданного фильма: {}", filmId);
-        log.debug("Идентификатор переданного жанра: {}", ratingId);
-
-        // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("ratingId", ratingId);
-
-        if (!exists(GET_RATING_ID_ON_FILM_QUERY, parameterSource)) {
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("ratingId", ratingId);
-
-            long updatedRows = update(INSERT_RATING_ON_FILM_QUERY, parameterSource);
-
-            if (updatedRows == 0) {
-                throw new RuntimeException("Не удалось установить рейтинг с id " + ratingId + "фильму с id " + filmId);
-            } else {
-                log.debug("На уровне хранилища обновлено  {} запись(ей)", updatedRows);
-            }
-
-            log.debug("Фильму с id {} присвоен рейтинг с id {}", filmId, ratingId);
-        } else {
-            log.debug("Рейтинг не будет установлен фильму, т.к. уже установлен");
-        }
-
-        log.debug("Возврат результата установки на уровень сервиса");
     }
 
     @Override

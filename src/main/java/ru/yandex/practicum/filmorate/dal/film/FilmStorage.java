@@ -113,14 +113,6 @@ public interface FilmStorage {
     void removeGenre(Long filmId, Long genreId);
 
     /**
-     * Метод добавляет фильму переданный рейтинг
-     *
-     * @param filmId идентификатор фильма
-     * @param ratingId идентификатор рейтинга
-     */
-    void addRating(Long filmId, Long ratingId);
-
-    /**
      * Метод удаляет с фильма переданный рейтинг
      *
      * @param filmId идентификатор фильма

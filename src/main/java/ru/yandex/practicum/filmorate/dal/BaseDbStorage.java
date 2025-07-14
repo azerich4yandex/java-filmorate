@@ -13,8 +13,8 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
 public class BaseDbStorage<T> {
 
     protected final NamedParameterJdbcTemplate jdbcTemplate;
