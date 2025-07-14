@@ -70,6 +70,21 @@ public class FilmController {
     }
 
     /**
+     * Обработка GET-запроса для /films/common?userId={userId}&friendId={friendId}
+     */
+    @GetMapping("/common")
+    public ResponseEntity<Collection<FilmDto>> findCommon(@RequestParam(name = "userId") Long userId,
+                                                          @RequestParam(name = "friendId") Long friendId) {
+        log.info("Поиск общих фильмов на уровне контроллера");
+
+        Collection<FilmDto> result = filmService.findCommon(userId, friendId);
+        log.debug("На уровень контроллера вернулась коллекция общих фильмов размером {}", result.size());
+
+        log.debug("Возвращение коллекции общих фильмов на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
      * Обработка GET-запроса для /films/popular?count={limit}&genreId={genreId}&year={year}
      */
     @GetMapping("/popular")
