@@ -358,10 +358,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         if (!exists(GET_LIKE_ID_QUERY, parameterSource)) {
             log.debug("Лайк будет добавлен в БД");
 
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("userId", userId);
-
             boolean isInserted = insertWithOutReturnId(INSERT_LIKE_QUERY, parameterSource);
             if (!isInserted) {
                 throw new RuntimeException(
