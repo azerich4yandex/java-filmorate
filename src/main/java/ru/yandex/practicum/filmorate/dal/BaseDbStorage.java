@@ -60,7 +60,6 @@ public class BaseDbStorage<T> {
         log.debug("Начало вызова поиск экземпляра с именованными переменными");
 
         T result;
-
         try {
             result = jdbcTemplate.queryForObject(query, params, mapper);
         } catch (DataAccessException ignored) {

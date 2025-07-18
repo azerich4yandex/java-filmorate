@@ -21,6 +21,11 @@ import lombok.NoArgsConstructor;
 public class Film {
 
     /**
+     * Отзывы о фильме
+     */
+    private final Set<Long> reviews = new HashSet<>();
+
+    /**
      * Список идентификаторов пользователей, которым понравился фильм
      */
     private final Set<Long> likes = new HashSet<>();
