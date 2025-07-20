@@ -190,6 +190,30 @@ public class FilmService {
     }
 
     /**
+     * Метод возвращает коллекцию рекомендованных к просмотру {@link FilmDto}
+     *
+     * @param userId идентификатор пользователя
+     * @return список рекомендованных к просмотру фильмов
+     */
+    public Collection<FilmDto> findUserRecommendations(Long userId) {
+        log.debug("Поиск рекомендованных фильмов на уровне сервиса");
+
+        Collection<Film> searchResult = filmStorage.findUserRecommendations(userId);
+        log.debug("Получена коллекция рекомендованных фильмов размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto filmDto : result) {
+            // Заполняем коллекции
+            completeDto(filmDto);
+        }
+        log.debug("Найденная коллекция рекомендованных фильмов преобразована. Размер после преобразования: {}", result.size());
+
+        log.debug("Возврат результатов поиска рекомендаций в сервис пользователей");
+        return result;
+    }
+
+    /**
      * Метод возвращает экземпляр класса {@link FilmDto}, найденный по идентификатору
      *
      * @param filmId идентификатор фильма

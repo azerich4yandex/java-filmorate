@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.yandex.practicum.filmorate.dto.film.FilmDto;
 import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UserDto;
@@ -48,24 +49,6 @@ public class UserController {
 
         log.info("Возврат результатов на уровень клиента");
         return new ResponseEntity<>(result, HttpStatus.OK);
-    }
-
-    /**
-     * Обработка GET-запроса для /users/{id}
-     *
-     * @param id идентификатор {@link User}
-     * @return экземпляр класса {@link UserDto}
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<UserDto> findById(@PathVariable Long id) {
-        log.info("Поиск пользователя по id на уровне контроллера");
-        log.debug("Передан id: {}", id);
-
-        UserDto user = userService.findById(id);
-        log.debug("На уровень контроллера вернулся пользователь с id {}", user.getId());
-
-        log.info("Возврат результата на уровень клиента");
-        return new ResponseEntity<>(user, HttpStatus.OK);
     }
 
     /**
@@ -104,6 +87,41 @@ public class UserController {
 
         log.info("Возврат результата поиска общих друзей на уровень клиента");
         return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /users/{id}/recommendations
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция фильмов для просмотра
+     */
+    @GetMapping("/{id}/recommendations")
+    public ResponseEntity<Collection<FilmDto>> getUserRecommendations(@PathVariable(name = "id") Long userId) {
+        log.info("Поиск рекомендаций для пользователя");
+        log.debug("Передан  id пользователя: {}", userId);
+        Collection<FilmDto> result = userService.getUserRecommendations(userId);
+        log.debug("На уровень контроллера вернулась коллекция рекомендаций размером {}", result.size());
+
+        log.info("Возврат результатов поиска рекомендаций на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /users/{id}
+     *
+     * @param id идентификатор {@link User}
+     * @return экземпляр класса {@link UserDto}
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDto> findById(@PathVariable Long id) {
+        log.info("Поиск пользователя по id на уровне контроллера");
+        log.debug("Передан id: {}", id);
+
+        UserDto user = userService.findById(id);
+        log.debug("На уровень контроллера вернулся пользователь с id {}", user.getId());
+
+        log.info("Возврат результата на уровень клиента");
+        return new ResponseEntity<>(user, HttpStatus.OK);
     }
 
     /**
