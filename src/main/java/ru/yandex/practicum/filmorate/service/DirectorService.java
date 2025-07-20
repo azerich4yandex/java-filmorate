@@ -168,7 +168,7 @@ public class DirectorService {
         log.debug("Возврат результатов удаления на уровень контроллера");
     }
 
-    public void clearDirectors () {
+    public void clearDirectors() {
         log.debug("Запрошена очистка хранилища режиссеров");
 
         // Очищаем хранилище
