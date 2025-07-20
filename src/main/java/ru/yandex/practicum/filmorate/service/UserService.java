@@ -11,14 +11,15 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.dal.user.UserStorage;
+import ru.yandex.practicum.filmorate.dto.film.FilmDto;
 import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
+import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UserDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
-import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.mapper.UserMapper;
+import ru.yandex.practicum.filmorate.model.User;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -30,6 +31,7 @@ public class UserService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final UserStorage userStorage;
+    private final FilmService filmService;
 
     /**
      * Метод возвращает коллекцию {@link UserDto}
@@ -137,6 +139,31 @@ public class UserService {
         log.debug("Коллекция общих друзей преобразована. Размер коллекции после преобразования: {}", result.size());
 
         log.debug("Возврат результатов поиска общих друзей на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает коллекцию рекомендаций для {@link FilmDto}
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция фильмов для просмотра
+     */
+    public Collection<FilmDto> getUserRecommendations(Long userId) {
+        log.debug("Запрос рекомендаций на уровне сервиса");
+        log.debug("Передан идентификатор пользователя: {}", userId);
+
+        if (userId == null) {
+            throw new ValidationException("Id пользователя должен быть указан");
+        }
+
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+
+        log.debug("Вызов сервиса фильмов для поиска рекомендаций");
+        Collection<FilmDto> result = filmService.findUserRecommendations(user.getId());
+        log.debug("На уровень сервиса вернулась коллекция рекомендованных фильмов размером {}", result.size());
+
+        log.debug("Возврат результатов поиска рекомендаций на уровень контроллера");
         return result;
     }
 

@@ -66,6 +66,14 @@ public interface FilmStorage {
     Collection<Film> findByDirectorId(Long directorId, String sortBy);
 
     /**
+     * Метод возвращает коллекцию рекомендованных пользователю фильмов
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция рекомендованных к просмотру фильмов
+     */
+    Collection<Film> findUserRecommendations(Long userId);
+
+    /**
      * Метод возвращает экземпляр класса {@link Film} из хранилища на основе переданного идентификатора
      *
      * @param filmId идентификатор фильма

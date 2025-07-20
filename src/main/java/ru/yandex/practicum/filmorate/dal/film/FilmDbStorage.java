@@ -130,6 +130,30 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                       f.RATING_ID,
                       r.FULL_NAME
             """;
+    private static final String GET_RECOMMENDED_FILMS_QUERY = """
+            SELECT f.ID,
+                   f.FULL_NAME,
+                   f.DESCRIPTION,
+                   f.RELEASE_DATE,
+                   f.DURATION,
+                   f.RATING_ID,
+                   r.FULL_NAME as rating_name
+              FROM USERS_FILMS uf1
+             INNER JOIN USERS_FILMS uf2 ON uf1.FILM_ID = uf2.FILM_ID
+             INNER JOIN USERS_FILMS uf3 ON uf2.USER_ID = uf3.USER_ID
+             INNER JOIN FILMS f ON uf3.FILM_ID = f.ID
+              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+             WHERE uf1.USER_ID = :userId
+               AND uf3.FILM_ID NOT IN (SELECT uf.FILM_ID FROM USERS_FILMS uf WHERE uf.USER_ID = uf1.USER_ID)
+             GROUP BY f.ID,
+                      f.FULL_NAME,
+                      f.DESCRIPTION,
+                      f.RELEASE_DATE,
+                      f.DURATION,
+                      f.RATING_ID,
+                      r.FULL_NAME
+             ORDER BY f.ID
+            """;
     private static final String GET_FILM_BY_ID_QUERY = """
             SELECT f.ID,
                    f.FULL_NAME,
@@ -336,6 +360,21 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Получена коллекция фильмов по режиссеру размером {}", result.size());
 
         log.debug("Возврат результатов поиска по режиссеру на уровень сервиса");
+        return result;
+    }
+
+    @Override
+    public Collection<Film> findUserRecommendations(Long userId) {
+        log.debug("Поиск рекомендованных фильмов на уровне хранилища");
+        log.debug("Передан идентификатор пользователя: {}", userId);
+
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("userId", userId, Types.BIGINT);
+
+        Collection<Film> result = findMany(GET_RECOMMENDED_FILMS_QUERY, parameterSource);
+        log.debug("Получена коллекция рекомендованных фильмов размером {}", result.size());
+
+        log.debug("Возврат результатов поиска рекомендованных фильмов на уровень сервиса");
         return result;
     }
 
