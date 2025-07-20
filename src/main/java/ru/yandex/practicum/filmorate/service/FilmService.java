@@ -13,19 +13,23 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.director.DirectorStorage;
 import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
 import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.dal.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.dal.user.UserStorage;
+import ru.yandex.practicum.filmorate.dto.director.DirectorDto;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
 import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
 import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
 import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.mapper.DirectorMapper;
 import ru.yandex.practicum.filmorate.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.mapper.GenreMapper;
 import ru.yandex.practicum.filmorate.mapper.UserMapper;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
@@ -44,6 +48,7 @@ public class FilmService {
     private final UserStorage userStorage;
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
+    private final DirectorStorage directorStorage;
 
     /**
      * Метод возвращает коллекцию {@link FilmDto}
@@ -145,6 +150,42 @@ public class FilmService {
         log.debug("Найденная коллекция топ-фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
 
         log.debug("Возврат коллекции топ-фильмов на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает коллекцию {@link FilmDto} на основе {@link FilmDto#getDirectors()}
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция {@link FilmDto}
+     */
+    public Collection<FilmDto> findByDirectorId(Long directorId, String sortBy) {
+        log.debug("Поиск фильмов по режиссеру на уровне сервиса");
+
+        if (directorId == null) {
+            throw new ValidationException("Передан пустой directorId");
+        } else {
+            log.debug("Передан id режиссера: {}", directorId);
+        }
+
+        log.debug("Передана последовательность полей сортировки: {}", (sortBy == null || sortBy.isBlank()) ? "null" : sortBy);
+
+        Director director = directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException("Режиссер с id " + directorId + " не найден"));
+
+        Collection<Film> searchResult = filmStorage.findByDirectorId(director.getId(), sortBy);
+        log.debug("Получена коллекция фильмов по режиссеру размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция фильмов по режиссеру преобразована. Размер после преобразования: {}", result.size());
+
+        log.debug("Возврат результатов поиска фильмов по режиссеру на уровень контроллера");
         return result;
     }
 
@@ -510,6 +551,9 @@ public class FilmService {
 
             // Заполняем коллекцию лайков фильма
             completeLikes(dto);
+
+            // Заполняем коллекцию режиссеров
+            completeDirectors(dto);
         }
     }
 
@@ -550,5 +594,19 @@ public class FilmService {
         // Устанавливаем полученную коллекцию фильму
         dto.setLikes(likes);
         log.debug("Полученная коллекция лайков установлена фильму");
+    }
+
+    private void completeDirectors(FilmDto dto) {
+        log.debug("Заполнение коллекции режиссеров фильма");
+
+        // Получаем список режиссеров фильма
+        Set<DirectorDto> directors = directorStorage.findByFilmId(dto.getId()).stream()
+                .map(DirectorMapper::mapToDirectorDto)
+                .collect(Collectors.toSet());
+        log.debug("Для фильма с id {} получена коллекция режиссеров размером {}", dto.getId(), directors.size());
+
+        // Устанавливаем полученную коллекцию фильму
+        dto.setDirectors(directors);
+        log.debug("Полученная коллекция режиссеров установлена фильму");
     }
 }

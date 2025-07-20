@@ -57,6 +57,15 @@ public interface FilmStorage {
     Collection<Film> findByRatingId(Long ratingId);
 
     /**
+     * Метод возвращает коллекцию фильмов по режиссеру
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция фильмов с таким же режиссером
+     */
+    Collection<Film> findByDirectorId(Long directorId, String sortBy);
+
+    /**
      * Метод возвращает экземпляр класса {@link Film} из хранилища на основе переданного идентификатора
      *
      * @param filmId идентификатор фильма
@@ -105,12 +114,28 @@ public interface FilmStorage {
     void addGenre(Long filmId, Long genreId);
 
     /**
+     * Метод добавляет режиссера фильму
+     *
+     * @param filmId идентификатор фильма
+     * @param directorId идентификатор режиссера
+     */
+    void addDirector(Long filmId, Long directorId);
+
+    /**
      * Метод удаляет жанр из фильма
      *
      * @param filmId идентификатор фильма
      * @param genreId идентификатор жанра
      */
     void removeGenre(Long filmId, Long genreId);
+
+    /**
+     * Метод удаляет режиссера из фильма
+     *
+     * @param filmId идентификатор фильма
+     * @param directorId идентификатор режиссера
+     */
+    void removeDirector(Long filmId, Long directorId);
 
     /**
      * Метод удаляет с фильма переданный рейтинг

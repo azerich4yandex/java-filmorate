@@ -52,6 +52,27 @@ public class FilmController {
     }
 
     /**
+     * Обработка GET-запроса для /films/director/{directorId}?sortBy=[year,likes]
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция {@link FilmDto}
+     */
+    @GetMapping("/director/{directorId}")
+    public ResponseEntity<Collection<FilmDto>> findFilmsByDirector(@PathVariable(name = "directorId") Long directorId,
+                                                                   @RequestParam(name = "sortBy") String sortBy) {
+        log.info("Запрос всех фильмов по режиссеру");
+        log.debug("Передан идентификатор режиссера: {}", directorId == null ? "null" : directorId);
+        log.debug("Передана последовательность полей сортировки: {}", sortBy == null ? "null" : sortBy);
+
+        Collection<FilmDto> result = filmService.findByDirectorId(directorId, sortBy);
+        log.debug("На уровень контроллера вернулась коллекция по режиссеру размером {}", result.size());
+
+        log.info("Возврат результатов поиска фильмов по режиссеру на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
      * Обработка GET-запроса для /films/{id}
      *
      * @param id идентификатор фильма
