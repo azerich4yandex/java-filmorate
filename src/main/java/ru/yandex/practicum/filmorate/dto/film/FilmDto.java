@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Set;
 import lombok.Builder;
 import lombok.Data;
+import ru.yandex.practicum.filmorate.dto.director.DirectorDto;
 import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
 import ru.yandex.practicum.filmorate.dto.mpa.MpaDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
@@ -20,4 +21,5 @@ public class FilmDto {
     private MpaDto mpa;
     private Set<GenreDto> genres;
     private Set<UserShortDto> likes;
+    private Set<DirectorDto> directors;
 }

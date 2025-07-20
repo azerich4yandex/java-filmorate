@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.dal.film;
 
+import java.sql.Types;
 import java.util.Collection;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +9,9 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.dal.BaseDbStorage;
+import ru.yandex.practicum.filmorate.dal.director.DirectorStorage;
 import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
+import ru.yandex.practicum.filmorate.model.Director;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 
@@ -104,6 +107,29 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 ON f.RATING_ID = r.ID
              WHERE r.ID = :ratingId
             """;
+    private static final String GET_FILMS_BY_DIRECTOR_ID = """
+            SELECT f.ID,
+                   f.FULL_NAME,
+                   f.DESCRIPTION,
+                   f.RELEASE_DATE,
+                   f.DURATION,
+                   f.RATING_ID,
+                   r.FULL_NAME as rating_name,
+                   NVL(COUNT(uf.ID), 0) AS likes
+              FROM FILMS f
+             INNER JOIN FILMS_DIRECTORS fd ON f.ID = fd.FILM_ID
+             INNER JOIN DIRECTORS d ON d.ID = fd.DIRECTOR_ID
+              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+              LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+             WHERE d.ID = :directorId
+             GROUP BY f.ID,
+                      f.FULL_NAME,
+                      f.DESCRIPTION,
+                      f.RELEASE_DATE,
+                      f.DURATION,
+                      f.RATING_ID,
+                      r.FULL_NAME
+            """;
     private static final String GET_FILM_BY_ID_QUERY = """
             SELECT f.ID,
                    f.FULL_NAME,
@@ -141,6 +167,12 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
              WHERE fg.FILM_ID = :filmId
                AND fg.GENRE_ID = :genreId
             """;
+    private static final String GET_DIRECTOR_AND_FILM_LINK_QUERY = """
+            SELECT 1 AS ID
+              FROM FILMS_DIRECTORS fd
+             WHERE fd.FILM_ID = :filmId
+               AND fd.DIRECTOR_ID = :directorId
+            """;
     private static final String INSERT_LIKE_QUERY = """
             INSERT INTO USERS_FILMS (FILM_ID, USER_ID)
             VALUES (:filmId, :userId)
@@ -148,6 +180,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     private static final String INSERT_GENRE_TO_FILM_QUERY = """
             INSERT INTO FILMS_GENRES (FILM_ID, GENRE_ID)
             VALUES (:filmId, :genreId)
+            """;
+    private static final String INSERT_DIRECTOR_TO_FILM_QUERY = """
+            INSERT INTO FILMS_DIRECTORS(FILM_ID, DIRECTOR_ID)
+            VALUES (:filmId, :directorId)
             """;
     private static final String DELETE_LIKE_QUERY = """
             DELETE FROM USERS_FILMS
@@ -158,6 +194,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             DELETE FROM FILMS_GENRES fg
              WHERE fg.FILM_ID = :filmId
                AND fg.GENRE_ID = :genreId
+            """;
+    private static final String DELETE_DIRECTOR_ON_FILM_QUERY = """
+            DELETE FROM FILMS_DIRECTORS fg
+             WHERE fg.FILM_ID = :filmId
+               AND fg.DIRECTOR_ID = :directorId
             """;
     private static final String REMOVE_RATING_FROM_FILM_QUERY = """
             UPDATE FILMS
@@ -173,12 +214,14 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             """;
 
     private final GenreStorage genreStorage;
+    private final DirectorStorage directorStorage;
 
     @Autowired
     public FilmDbStorage(NamedParameterJdbcTemplate jdbcTemplate, FilmRowMapper filmRowMapper,
-                         GenreStorage genreStorage) {
+                         GenreStorage genreStorage, DirectorStorage directorStorage) {
         super(jdbcTemplate, filmRowMapper);
         this.genreStorage = genreStorage;
+        this.directorStorage = directorStorage;
     }
 
     @Override
@@ -231,7 +274,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Получаем коллекцию популярных фильмов
         Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, parameterSource);
-        log.debug("На уровне сервиса получена коллекция размером {}", result.size());
+        log.debug("На уровне хранилища получена коллекция размером {}", result.size());
 
         // Возвращаем результат
         log.debug("Возврат результатов на уровень сервиса");
@@ -265,6 +308,34 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Получена коллекция фильмов по жанру размером {}", result.size());
 
         log.debug("Возврат результатов поиска по рейтингу на уровень сервиса");
+        return result;
+    }
+
+    @Override
+    public Collection<Film> findByDirectorId(Long directorId, String sortBy) {
+        log.debug("Запрос списка фильмов по режиссеру на уровне хранилища");
+        log.debug("Передан id режиссера: {}", directorId);
+        log.debug("Передана последовательность полей сортировки: {}",
+                (sortBy == null || sortBy.isBlank()) ? "null" : sortBy);
+
+        String orderBy = "";
+
+        if (!(sortBy == null || sortBy.isBlank())) {
+            String[] fields = sortBy.split(",");
+            for (String field : fields) {
+                orderBy = addField(orderBy, field.toUpperCase());
+            }
+        } else {
+            orderBy = "LIKES DESC";
+        }
+
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("directorId", directorId);
+
+        Collection<Film> result = findMany(GET_FILMS_BY_DIRECTOR_ID + "\n ORDER BY " + orderBy, parameterSource);
+        log.debug("Получена коллекция фильмов по режиссеру размером {}", result.size());
+
+        log.debug("Возврат результатов поиска по режиссеру на уровень сервиса");
         return result;
     }
 
@@ -418,10 +489,6 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         if (!exists(GET_GENRE_AND_FILM_LINK_QUERY, parameterSource)) {
             log.debug("Жанр будет добавлен фильму");
 
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("genreId", genreId);
-
             boolean isInserted = insertWithOutReturnId(INSERT_GENRE_TO_FILM_QUERY, parameterSource);
             if (!isInserted) {
                 throw new RuntimeException("Не удалось добавить жанр с id " + genreId + " фильму с id " + filmId);
@@ -436,6 +503,33 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     }
 
     @Override
+    public void addDirector(Long filmId, Long directorId) {
+        log.debug("Добавление режиссера фильму на уровне хранилища");
+        log.debug("Передан идентификатор фильма: {}", filmId == null ? "null" : filmId);
+        log.debug("Передан идентификатор режиссера: {}", directorId == null ? "null" : directorId);
+
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("directorId", directorId, Types.BIGINT);
+
+        if (!exists(GET_DIRECTOR_AND_FILM_LINK_QUERY, parameterSource)) {
+            log.debug("Режиссер будет добавлен фильму");
+
+            boolean isInserted = insertWithOutReturnId(INSERT_DIRECTOR_TO_FILM_QUERY, parameterSource);
+            if (!isInserted) {
+                throw new RuntimeException(
+                        "Не удалось добавить режиссера с id " + directorId + " фильму с id " + filmId);
+            } else {
+                log.debug("Фильму с id {} добавлен режиссер с id {}", filmId, directorId);
+            }
+        } else {
+            log.debug("Режиссер не будет добавлен фильму т.к. уже существует");
+        }
+
+        log.debug("Возврат результатов добавления режиссера на уровень сервиса");
+    }
+
+    @Override
     public void removeGenre(Long filmId, Long genreId) {
         log.debug("Удаление жанра из фильма на уровне хранилища");
         log.debug("Переданный идентификатор изменяемого фильма: {}", filmId);
@@ -445,11 +539,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 .addValue("filmId", filmId)
                 .addValue("genreId", genreId);
 
-        if (!exists(GET_GENRE_AND_FILM_LINK_QUERY, parameterSource)) {
-            parameterSource = new MapSqlParameterSource()
-                    .addValue("filmId", filmId)
-                    .addValue("genreId", genreId);
-
+        if (exists(GET_GENRE_AND_FILM_LINK_QUERY, parameterSource)) {
             long deletedRows = deleteOne(DELETE_GENRE_ON_FILM_QUERY, parameterSource);
             if (deletedRows == 0) {
                 throw new RuntimeException(
@@ -461,6 +551,34 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         }
 
         log.debug("Возврат результата удаления жанра на уровень сервиса");
+    }
+
+    @Override
+    public void removeDirector(Long filmId, Long directorId) {
+        log.debug("Удаление режиссера из фильма на уровне хранилища");
+        log.debug("Передан id  фильма: {}", filmId);
+        log.debug("Передан id  режиссера: {}", directorId);
+
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("directorId", directorId, Types.BIGINT);
+
+        if (exists(GET_DIRECTOR_AND_FILM_LINK_QUERY, parameterSource)) {
+            log.debug("Режиссер будет удален из фильма");
+
+            long deletedRows = deleteOne(DELETE_DIRECTOR_ON_FILM_QUERY, parameterSource);
+
+            if (deletedRows == 0) {
+                throw new RuntimeException(
+                        "Не удалось удалить связь режиссера с id " + directorId + " и фильма с id " + filmId);
+            } else {
+                log.debug("Режиссер с id {} больше не принадлежит фильму с id {}", directorId, filmId);
+            }
+        } else {
+            log.debug("Режиссер не будет удален из фильма, т.к. отсутствует в БД");
+        }
+
+        log.debug("Возврат результатов удаления связи с режиссером на уровне сервиса");
     }
 
     @Override
@@ -492,11 +610,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 .addValue("filmId", filmId);
 
         long deletedRows = deleteOne(DELETE_FILM_BY_ID_QUERY, parameterSource);
-
-        if (deletedRows == 0) {
-            throw new RuntimeException("Не удалось удалить фильм с id " + filmId);
-        }
-
+        log.debug("На уровне хранилища удалено {} запись(ей)", deletedRows);
         log.debug("Фильм с id {} удален из хранилища", filmId);
 
         log.debug("Возврат результатов удаления на уровень сервиса");
@@ -524,6 +638,11 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Распространяем коллекцию жанров
         propagateGenres(film);
+
+        // Распространяем коллекцию режиссеров
+        propagateDirectors(film);
+
+        log.debug("Распространение коллекций фильма завершено");
     }
 
     /**
@@ -540,10 +659,26 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             for (Long genreId : film.getGenres()) {
                 addGenre(film.getId(), genreId);
             }
-            log.debug("Добавление списка завершено");
+            log.debug("Добавление списка жанров завершено");
         } else {
             log.debug("Передана пустая коллекция жанров. Будет произведена очистка связей на уровне БД");
             clearGenres(film);
+        }
+    }
+
+    private void propagateDirectors(Film film) {
+        if (!film.getDirectors().isEmpty()) {
+            log.debug("Найдена коллекция режиссеров");
+            clearDirectors(film);
+
+            log.debug("Добавление нового списка режиссеров");
+            for (Long directorId : film.getDirectors()) {
+                addDirector(film.getId(), directorId);
+            }
+            log.debug("Добавление списка режиссеров завершено");
+        } else {
+            log.debug("Передана пустая коллекция режиссеров. Будет произведена очистка связей на уровне БД");
+            clearDirectors(film);
         }
     }
 
@@ -564,5 +699,46 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             }
         }
         log.debug("Очистка завершена");
+    }
+
+    private void clearDirectors(Film film) {
+        log.debug("Очистка имеющихся режиссеров");
+
+        Collection<Long> directorIds = directorStorage.findByFilmId(film.getId()).stream().map(Director::getId)
+                .toList();
+
+        if (!directorIds.isEmpty()) {
+            log.debug("В БД найдены связи с режиссерами, подлежащие удалению");
+            for (Long directorId : directorIds) {
+                removeDirector(film.getId(), directorId);
+            }
+        }
+        log.debug("Очистка коллекции режиссеров завершена");
+    }
+
+    /**
+     * Метод добавляет поле в порядок сортировки результатов запроса
+     *
+     * @param orderBy исходная последовательность сортировки
+     * @param field добавляемое к исходной сортировке поле
+     * @return обработанная последовательность сортировки
+     */
+    private String addField(String orderBy, String field) {
+        if (orderBy == null || orderBy.isBlank()) {
+            orderBy = getOrderName(field);
+        } else {
+            orderBy += ", " + getOrderName(field);
+        }
+
+        return orderBy;
+    }
+
+    private String getOrderName(String field) {
+        return switch (field) {
+            case "YEAR" -> "YEAR(f.RELEASE_DATE) ASC";
+            case "LIKES" -> "LIKES DESC";
+            default -> throw new RuntimeException(
+                    "Для сортировки результатов запроса выбрано неизвестное имя поля " + field);
+        };
     }
 }

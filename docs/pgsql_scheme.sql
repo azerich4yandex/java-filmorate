@@ -14,6 +14,9 @@ START 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE IF NOT EXISTS seq_reviews INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
+CREATE SEQUENCE IF NOT EXISTS seq_directors INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
 -- Создание таблиц
 CREATE TABLE IF NOT EXISTS users
 (
@@ -136,6 +139,26 @@ CREATE TABLE IF NOT EXISTS users_reviews (
   CONSTRAINT users_reviews_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users (id),
   CONSTRAINT users_reviews_useful_chk CHECK (useful in (-1, 1))
 );
+
+CREATE TABLE IF NOT EXISTS directors (
+  id integer DEFAULT nextval('seq_directors') NOT NULL,
+  full_name text NOT NULL,
+  CONSTRAINT directors_pk PRIMARY KEY (id)
+);
+COMMENT ON TABLE directors IS 'Режиссеры';
+COMMENT ON COLUMN directors.id IS 'Идентификатор записи';
+COMMENT ON COLUMN directors.full_name IS 'Имя режиссера';
+
+CREATE TABLE IF NOT EXISTS films_directors (
+  film_id integer NOT NULL,
+  director_id integer NOT NULL,
+  CONSTRAINT films_directors_pk PRIMARY KEY (film_id, director_id),
+  CONSTRAINT films_directors_films_film_id_fk FOREIGN KEY (film_id) REFERENCES films (id),
+  CONSTRAINT films_directors_directors_director_id_fk FOREIGN KEY (director_id) REFERENCES directors (id)
+);
+COMMENT ON TABLE films_directors IS 'Связь фильмов и режиссеров';
+COMMENT ON COLUMN films_directors.film_id IS 'Идентификатор фильма';
+COMMENT ON COLUMN films_directors.director_id IS 'Идентификатор режиссера';
 
 -- Заполнение справочников
 WITH prepared_data AS

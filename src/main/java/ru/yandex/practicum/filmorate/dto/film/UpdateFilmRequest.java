@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.Set;
 import lombok.Builder;
 import lombok.Data;
+import ru.yandex.practicum.filmorate.dto.director.DirectorDto;
 import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
 import ru.yandex.practicum.filmorate.dto.mpa.MpaDto;
 import ru.yandex.practicum.filmorate.dto.user.UserDto;
@@ -20,6 +21,7 @@ public class UpdateFilmRequest {
     private MpaDto mpa;
     private Set<GenreDto> genres;
     private Set<UserDto> likes;
+    private Set<DirectorDto> directors;
 
     public boolean hasId() {
         return id != null && id > 0;
@@ -47,5 +49,9 @@ public class UpdateFilmRequest {
 
     public boolean hasGenres() {
         return !(genres == null || genres.isEmpty());
+    }
+
+    public boolean hasDirectors() {
+        return !(directors == null || directors.isEmpty());
     }
 }
