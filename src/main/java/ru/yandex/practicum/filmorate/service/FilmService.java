@@ -4,6 +4,7 @@ import jakarta.validation.ValidationException;
 import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -82,10 +83,12 @@ public class FilmService {
         log.debug("Поиск общих фильмов на уровне сервиса");
 
         // Проверяем наличие пользователя
-        User user = userStorage.findById(userId).orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
 
         // Проверяем наличие друга
-        User friend = userStorage.findById(friendId).orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден"));
+        User friend = userStorage.findById(friendId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден"));
 
         Collection<Film> searchResult = filmStorage.findCommon(user.getId(), friend.getId());
         log.debug("Получена коллекция общих фильмов размером {}", searchResult.size());
@@ -97,7 +100,8 @@ public class FilmService {
             // Заполняем коллекции
             completeDto(film);
         }
-        log.debug("Найденная коллекция общих фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
+        log.debug("Найденная коллекция общих фильмов преобразована. Размер преобразованной коллекции: {}",
+                result.size());
 
         log.debug("Возврат коллекции общих фильмов на уровень контроллера");
         return result;
@@ -153,6 +157,35 @@ public class FilmService {
         return result;
     }
 
+    public Collection<FilmDto> findSearchResults(String query, String by) {
+        log.debug("Поиск фильмов по вхождению строки в перечисленные поля");
+
+        if (query == null || query.trim().isBlank()) {
+            log.debug("Передана пустая строка поиска. Возвращаем пустую коллекцию");
+            return new ArrayList<>();
+        }
+
+        if (by == null || by.trim().isBlank()) {
+            log.debug("Передан пустой список полей. Возвращаем пустую коллекцию");
+            return new ArrayList<>();
+        }
+
+        Collection<Film> searchResult = filmStorage.findSearchResult(query, by);
+        log.debug("На уровень сервиса после поиска подстроки вернулась коллекция фильмов размером {}",
+                searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
+
+        log.debug("Возврат коллекции фильмов на уровень контроллера");
+        return result;
+    }
+
     /**
      * Метод возвращает коллекцию {@link FilmDto} на основе {@link FilmDto#getDirectors()}
      *
@@ -169,7 +202,8 @@ public class FilmService {
             log.debug("Передан id режиссера: {}", directorId);
         }
 
-        log.debug("Передана последовательность полей сортировки: {}", (sortBy == null || sortBy.isBlank()) ? "null" : sortBy);
+        log.debug("Передана последовательность полей сортировки: {}",
+                (sortBy == null || sortBy.isBlank()) ? "null" : sortBy);
 
         Director director = directorStorage.findById(directorId)
                 .orElseThrow(() -> new NotFoundException("Режиссер с id " + directorId + " не найден"));
@@ -183,7 +217,8 @@ public class FilmService {
             // Заполняем коллекции
             completeDto(film);
         }
-        log.debug("Найденная коллекция фильмов по режиссеру преобразована. Размер после преобразования: {}", result.size());
+        log.debug("Найденная коллекция фильмов по режиссеру преобразована. Размер после преобразования: {}",
+                result.size());
 
         log.debug("Возврат результатов поиска фильмов по режиссеру на уровень контроллера");
         return result;
@@ -207,7 +242,8 @@ public class FilmService {
             // Заполняем коллекции
             completeDto(filmDto);
         }
-        log.debug("Найденная коллекция рекомендованных фильмов преобразована. Размер после преобразования: {}", result.size());
+        log.debug("Найденная коллекция рекомендованных фильмов преобразована. Размер после преобразования: {}",
+                result.size());
 
         log.debug("Возврат результатов поиска рекомендаций в сервис пользователей");
         return result;

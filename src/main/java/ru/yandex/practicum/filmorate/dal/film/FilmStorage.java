@@ -42,6 +42,15 @@ public interface FilmStorage {
     Collection<Film> findPopular(Integer count, Long genreId, Integer year);
 
     /**
+     * Метод возвращает коллекцию фильмов, содержащих подстроку в перечисленных полях
+     *
+     * @param query подстрока для поиска
+     * @param by перечень полей
+     * @return коллекция фильмов, содержащих переданную подстроку в перечисленных полях
+     */
+    Collection<Film> findSearchResult(String query, String by);
+
+    /**
      * Метод возвращает коллекцию фильмов с таким же жанром
      *
      * @return коллекция фильмов с таким же жанром

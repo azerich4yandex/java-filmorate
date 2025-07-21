@@ -1,7 +1,9 @@
 package ru.yandex.practicum.filmorate.dal.film;
 
 import java.sql.Types;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +79,21 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
              GROUP BY f.ID, r.ID
              ORDER BY CNT  DESC
              LIMIT :count
+            """;
+    private static final String GET_FILMS_WITH_LIKE_QUERY = """
+            SELECT f.ID,
+                   f.FULL_NAME,
+                   f.DESCRIPTION,
+                   f.RELEASE_DATE,
+                   f.DURATION,
+                   f.RATING_ID,
+                   r.FULL_NAME AS rating_name,
+                   NVL(COUNT(uf.USER_ID), 0) AS likes
+              FROM FILMS f
+              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+              LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+              LEFT JOIN FILMS_DIRECTORS fd ON f.ID = fd.FILM_ID
+              LEFT JOIN DIRECTORS d ON fd.DIRECTOR_ID = d.ID
             """;
     private static final String GET_ALL_FILMS_BY_GENRE_QUERY = """
             SELECT f.ID,
@@ -302,6 +319,56 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Возвращаем результат
         log.debug("Возврат результатов на уровень сервиса");
+        return result;
+    }
+
+    @Override
+    public Collection<Film> findSearchResult(String query, String by) {
+        log.debug("Запрос списка фильмов по подстроке на уровне хранилища");
+        log.debug("Передано значение query: {}", query);
+        log.debug("Передано значение by: {}", by);
+
+        // Создаём пустой набор параметров
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource();
+
+        // Создаём строку запроса
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append(GET_FILMS_WITH_LIKE_QUERY);
+        stringBuilder.append(" WHERE");
+
+        // Разделяем набор полей
+        String[] fields = by.split(",");
+
+        // Получаем список условий для созданного набора полей
+        List<String> clauses = getClauses(fields, query);
+
+        // Если список полученных условий пуст
+        if (clauses.isEmpty()) {
+            log.debug("Во время интерпретации полей не получено условий. Возвращаем пустую коллекцию");
+            // Возвращаем пустой список
+            return new ArrayList<>();
+        }
+
+        // Иначе каждое условие добавляем в запрос
+        for (int i = 0; i < clauses.size(); i++) {
+            if (i == 0) {
+                stringBuilder.append(" ").append(clauses.get(i));
+            } else {
+                stringBuilder.append("\n   OR ").append(clauses.get(i));
+            }
+        }
+
+        // Добавляем группировку
+        stringBuilder.append(
+                "\n GROUP BY f.ID, f.FULL_NAME, f.DESCRIPTION, f.RELEASE_DATE, f.DURATION, f.RATING_ID, r.FULL_NAME");
+
+        // Заканчиваем строку запроса сортировкой
+        stringBuilder.append("\n ORDER BY likes DESC");
+
+        Collection<Film> result = findMany(stringBuilder.toString(), parameterSource);
+        log.debug("На уровне хранилища получена коллекция фильмов размером {}", result.size());
+
+        log.debug("Возврат результатов поиска по подстроке на уровень сервиса");
         return result;
     }
 
@@ -772,12 +839,49 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         return orderBy;
     }
 
+    /**
+     * Метод интерпретирует переданную команду в поле с указанным порядком сортировки
+     *
+     * @param field команда
+     * @return поле с указанным порядком сортировки
+     */
     private String getOrderName(String field) {
         return switch (field) {
             case "YEAR" -> "YEAR(f.RELEASE_DATE) ASC";
             case "LIKES" -> "LIKES DESC";
             default -> throw new RuntimeException(
                     "Для сортировки результатов запроса выбрано неизвестное имя поля " + field);
+        };
+    }
+
+    /**
+     * Метод добавляет переданные поля в условия поиска
+     *
+     * @param fields поля для поиска подстроки
+     * @param query подстрока поиска
+     * @return массив условий поиска
+     */
+    private ArrayList<String> getClauses(String[] fields, String query) {
+        ArrayList<String> result = new ArrayList<>();
+        for (String field : fields) {
+            result.add(getClause(field.toUpperCase(), query));
+        }
+
+        return result;
+    }
+
+    /**
+     * Метод создаёт условие поиска на основе переданного синонима поля и подстроки
+     *
+     * @param field синоним поля
+     * @param query подстрока поиска
+     * @return условие поиска
+     */
+    private String getClause(String field, String query) {
+        return switch (field) {
+            case "TITLE" -> "(f.FULL_NAME LIKE '%" + query + "%')";
+            case "DIRECTOR" -> "(d.FULL_NAME LIKE '%" + query + "%')";
+            default -> throw new RuntimeException("Для поиска подстроки указано неизвестное имя поля " + field);
         };
     }
 }
