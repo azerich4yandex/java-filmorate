@@ -92,6 +92,8 @@ public class FilmController {
 
     /**
      * Обработка GET-запроса для /films/common?userId={userId}&friendId={friendId}
+     *
+     * @return коллекция {@link FilmDto}
      */
     @GetMapping("/common")
     public ResponseEntity<Collection<FilmDto>> findCommon(@RequestParam(name = "userId") Long userId,
@@ -107,6 +109,8 @@ public class FilmController {
 
     /**
      * Обработка GET-запроса для /films/popular?count={limit}&genreId={genreId}&year={year}
+     *
+     * @return коллекция {@link FilmDto}
      */
     @GetMapping("/popular")
     public ResponseEntity<Collection<FilmDto>> findPopular(
@@ -122,6 +126,28 @@ public class FilmController {
         log.debug("На уровень контроллера вернулась коллекция топ-фильмов размером {}", result.size());
 
         log.info("Возвращение топ фильмов на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /films/search?query=подстрока&by=director,title
+     *
+     * @param query строка вхождения
+     * @param by перечень полей поиска строки вхождения
+     * @return коллекция {@link FilmDto}
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Collection<FilmDto>> findSearchResults(
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "by", required = false) String by) {
+        log.info("Поиск фильмов по вхождению строки на уровне контроллера");
+        log.debug("Передано значение query: {}", query == null ? "null" : query);
+        log.debug("Передано значение by: {}", by == null ? "null" : by);
+
+        Collection<FilmDto> result = filmService.findSearchResults(query, by);
+        log.debug("На уровень контроллера после поиска вернулась коллекция размером {}", result.size());
+
+        log.info("Возврат результатов поиска фильмов по вхождению строки на уровень клиента");
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
 
