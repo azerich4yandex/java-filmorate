@@ -8,6 +8,10 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 @ConfigurationPropertiesScan
 public class FilmorateApplication {
 
+    /**
+     * Метод - точка входа в приложение
+     * @param args параметры командной строки
+     */
     public static void main(String[] args) {
         SpringApplication.run(FilmorateApplication.class, args);
     }

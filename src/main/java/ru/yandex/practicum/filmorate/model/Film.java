@@ -21,6 +21,16 @@ import lombok.NoArgsConstructor;
 public class Film {
 
     /**
+     * Режиссеры фильма
+     */
+    private final Set<Long> directors = new HashSet<>();
+
+    /**
+     * Отзывы о фильме
+     */
+    private final Set<Long> reviews = new HashSet<>();
+
+    /**
      * Список идентификаторов пользователей, которым понравился фильм
      */
     private final Set<Long> likes = new HashSet<>();
@@ -72,12 +82,12 @@ public class Film {
     }
 
     /**
-     * Метод обновляет коллекцию идентификаторов пользователей, которым понравился фильм
+     * Метод обновляет коллекцию идентификаторов режиссеров
      *
-     * @param userIds коллекция идентификаторов пользователей
+     * @param directorIds коллекция идентификаторов режиссеров
      */
-    public void setLikes(Collection<Long> userIds) {
-        this.likes.clear();
-        this.likes.addAll(userIds);
+    public void setDirectors(Collection<Long> directorIds) {
+        this.directors.clear();
+        this.directors.addAll(directorIds);
     }
 }

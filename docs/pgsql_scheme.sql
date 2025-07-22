@@ -11,6 +11,15 @@ START 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE IF NOT EXISTS seq_films INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
+CREATE SEQUENCE IF NOT EXISTS seq_reviews INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE IF NOT EXISTS seq_directors INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE IF NOT EXISTS seq_feed INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
 -- Создание таблиц
 CREATE TABLE IF NOT EXISTS users
 (
@@ -106,6 +115,71 @@ CREATE TABLE IF NOT EXISTS films_genres
 COMMENT ON TABLE films_genres IS 'Таблица связей между фильмами и жанрами';
 COMMENT ON COLUMN films_genres.film_id IS 'Ссылка на идентификатор фильма';
 COMMENT ON COLUMN films_genres.genre_id IS 'Ссылка на идентификатор жанра';
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id integer DEFAULT nextval('seq_reviews') NOT NULL,
+  user_id integer NOT NULL,
+  film_id integer NOT NULL,
+  content text NOT NULL,
+  is_positive boolean,
+  CONSTRAINT reviews_pk PRIMARY KEY (id),
+  CONSTRAINT users_reviews_user_id_fk FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT films_reviews_film_id_fk FOREIGN KEY (film_id) REFERENCES films (id)
+);
+COMMENT ON TABLE reviews IS 'Отзывы';
+COMMENT ON COLUMN reviews.id IS 'Идентификатор записи';
+COMMENT ON COLUMN reviews.user_id IS 'Идентификатор пользователя-автора';
+COMMENT ON COLUMN reviews.film_id IS 'Идентификатор фильма, на который оставляют отзыв';
+COMMENT ON COLUMN reviews.content IS 'Описание отзыва';
+COMMENT ON COLUMN reviews.is_positive IS 'Признак положительного отзыва';
+
+CREATE TABLE IF NOT EXISTS users_reviews (
+  review_id integer NOT NULL,
+  user_id integer,
+  useful integer NOT NULL,
+  CONSTRAINT users_reviews_pk PRIMARY KEY (review_id, user_id),
+  CONSTRAINT users_reviews_reviews_review_id_fk FOREIGN KEY (review_id) REFERENCES reviews (id),
+  CONSTRAINT users_reviews_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users (id),
+  CONSTRAINT users_reviews_useful_chk CHECK (useful in (-1, 1))
+);
+
+CREATE TABLE IF NOT EXISTS directors (
+  id integer DEFAULT nextval('seq_directors') NOT NULL,
+  full_name text NOT NULL,
+  CONSTRAINT directors_pk PRIMARY KEY (id)
+);
+COMMENT ON TABLE directors IS 'Режиссеры';
+COMMENT ON COLUMN directors.id IS 'Идентификатор записи';
+COMMENT ON COLUMN directors.full_name IS 'Имя режиссера';
+
+CREATE TABLE IF NOT EXISTS films_directors (
+  film_id integer NOT NULL,
+  director_id integer NOT NULL,
+  CONSTRAINT films_directors_pk PRIMARY KEY (film_id, director_id),
+  CONSTRAINT films_directors_films_film_id_fk FOREIGN KEY (film_id) REFERENCES films (id),
+  CONSTRAINT films_directors_directors_director_id_fk FOREIGN KEY (director_id) REFERENCES directors (id)
+);
+COMMENT ON TABLE films_directors IS 'Связь фильмов и режиссеров';
+COMMENT ON COLUMN films_directors.film_id IS 'Идентификатор фильма';
+COMMENT ON COLUMN films_directors.director_id IS 'Идентификатор режиссера';
+
+CREATE TABLE IF NOT EXISTS feed (
+  event_id integer DEFAULT nextval('seq_feed') NOT NULL,
+  entity_id integer NOT NULL,
+  user_id integer NOT NULL,
+  time_field timestamp NOT NULL,
+  event_type text NOT NULL,
+  operation_type text NOT NULL,
+  CONSTRAINT feed_pk PRIMARY KEY (event_id),
+  CONSTRAINT feed_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users (id)
+);
+COMMENT ON TABLE feed IS 'Лента событий';
+COMMENT ON COLUMN feed.event_id IS 'Идентификатор записи';
+COMMENT ON COLUMN feed.entity_id IS 'Идентификатор обработанной сущности';
+COMMENT ON COLUMN feed.user_id IS 'Идентификатор пользователя';
+COMMENT ON COLUMN feed.time_field IS 'Метка времени';
+COMMENT ON COLUMN feed.event_type IS 'Тип события';
+COMMENT ON COLUMN feed.operation_type IS 'Тип операции';
 
 -- Заполнение справочников
 WITH prepared_data AS

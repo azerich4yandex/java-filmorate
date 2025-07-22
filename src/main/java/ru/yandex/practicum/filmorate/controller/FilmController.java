@@ -14,18 +14,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.yandex.practicum.filmorate.service.FilmService;
-import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
+import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
 import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
+import ru.yandex.practicum.filmorate.service.FilmService;
 
 /**
  * Контроллер для обработки HTTP-запросов для /films
  */
-@Slf4j
-@RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/films")
+@RestController
 public class FilmController {
 
     private final FilmService filmService;
@@ -52,6 +52,27 @@ public class FilmController {
     }
 
     /**
+     * Обработка GET-запроса для /films/director/{directorId}?sortBy=[year,likes]
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция {@link FilmDto}
+     */
+    @GetMapping("/director/{directorId}")
+    public ResponseEntity<Collection<FilmDto>> findFilmsByDirector(@PathVariable(name = "directorId") Long directorId,
+                                                                   @RequestParam(name = "sortBy") String sortBy) {
+        log.info("Запрос всех фильмов по режиссеру");
+        log.debug("Передан идентификатор режиссера: {}", directorId == null ? "null" : directorId);
+        log.debug("Передана последовательность полей сортировки: {}", sortBy == null ? "null" : sortBy);
+
+        Collection<FilmDto> result = filmService.findByDirectorId(directorId, sortBy);
+        log.debug("На уровень контроллера вернулась коллекция по режиссеру размером {}", result.size());
+
+        log.info("Возврат результатов поиска фильмов по режиссеру на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
      * Обработка GET-запроса для /films/{id}
      *
      * @param id идентификатор фильма
@@ -70,18 +91,63 @@ public class FilmController {
     }
 
     /**
-     * Обработка GET-запроса для /films/popular?count={count}
+     * Обработка GET-запроса для /films/common?userId={userId}&friendId={friendId}
+     *
+     * @return коллекция {@link FilmDto}
+     */
+    @GetMapping("/common")
+    public ResponseEntity<Collection<FilmDto>> findCommon(@RequestParam(name = "userId") Long userId,
+                                                          @RequestParam(name = "friendId") Long friendId) {
+        log.info("Поиск общих фильмов на уровне контроллера");
+
+        Collection<FilmDto> result = filmService.findCommon(userId, friendId);
+        log.debug("На уровень контроллера вернулась коллекция общих фильмов размером {}", result.size());
+
+        log.debug("Возвращение коллекции общих фильмов на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /films/popular?count={limit}&genreId={genreId}&year={year}
+     *
+     * @return коллекция {@link FilmDto}
      */
     @GetMapping("/popular")
     public ResponseEntity<Collection<FilmDto>> findPopular(
-            @RequestParam(name = "count", required = false, defaultValue = "10") Integer count) {
+            @RequestParam(name = "count", required = false, defaultValue = "10") Integer limit,
+            @RequestParam(name = "genreId", required = false) Long genreId,
+            @RequestParam(name = "year", required = false) Integer year) {
         log.info("Поиск топ фильмов на уровне контроллера");
-        log.debug("Передано значение count = {}", count);
+        log.debug("Передано значение limit = {}", limit);
+        log.debug("Передано значение genreId = {}", genreId == null ? "null" : genreId);
+        log.debug("Передано значение year = {}", year == null ? "null" : year);
 
-        Collection<FilmDto> result = filmService.findPopular(count);
+        Collection<FilmDto> result = filmService.findPopular(limit, genreId, year);
         log.debug("На уровень контроллера вернулась коллекция топ-фильмов размером {}", result.size());
 
         log.info("Возвращение топ фильмов на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /films/search?query=подстрока&by=director,title
+     *
+     * @param query строка вхождения
+     * @param by перечень полей поиска строки вхождения
+     * @return коллекция {@link FilmDto}
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Collection<FilmDto>> findSearchResults(
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "by", required = false) String by) {
+        log.info("Поиск фильмов по вхождению строки на уровне контроллера");
+        log.debug("Передано значение query: {}", query == null ? "null" : query);
+        log.debug("Передано значение by: {}", by == null ? "null" : by);
+
+        Collection<FilmDto> result = filmService.findSearchResults(query, by);
+        log.debug("На уровень контроллера после поиска вернулась коллекция размером {}", result.size());
+
+        log.info("Возврат результатов поиска фильмов по вхождению строки на уровень клиента");
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
 

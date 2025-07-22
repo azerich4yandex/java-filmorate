@@ -21,13 +21,34 @@ public interface FilmStorage {
      */
     Collection<Film> findAll(Integer size, Integer from);
 
+
+    /**
+     * Метод возвращает коллекцию общих для двух пользователей фильмов
+     *
+     * @param userId идентификатор первого пользователя
+     * @param friendId идентификатор второго пользователя
+     * @return коллекция {@link Film}
+     */
+    Collection<Film> findCommon(Long userId, Long friendId);
+
     /**
      * Метод возвращает коллекцию популярных фильмов
      *
      * @param count размер коллекции
+     * @param genreId идентификатор жанра
+     * @param year год выпуска
      * @return коллекция популярных фильмов указанного размера
      */
-    Collection<Film> findPopular(Integer count);
+    Collection<Film> findPopular(Integer count, Long genreId, Integer year);
+
+    /**
+     * Метод возвращает коллекцию фильмов, содержащих подстроку в перечисленных полях
+     *
+     * @param query подстрока для поиска
+     * @param by перечень полей
+     * @return коллекция фильмов, содержащих переданную подстроку в перечисленных полях
+     */
+    Collection<Film> findSearchResult(String query, String by);
 
     /**
      * Метод возвращает коллекцию фильмов с таким же жанром
@@ -43,6 +64,23 @@ public interface FilmStorage {
      * @return коллекция фильмов с таким же рейтингом
      */
     Collection<Film> findByRatingId(Long ratingId);
+
+    /**
+     * Метод возвращает коллекцию фильмов по режиссеру
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция фильмов с таким же режиссером
+     */
+    Collection<Film> findByDirectorId(Long directorId, String sortBy);
+
+    /**
+     * Метод возвращает коллекцию рекомендованных пользователю фильмов
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция рекомендованных к просмотру фильмов
+     */
+    Collection<Film> findUserRecommendations(Long userId);
 
     /**
      * Метод возвращает экземпляр класса {@link Film} из хранилища на основе переданного идентификатора
@@ -65,7 +103,6 @@ public interface FilmStorage {
      * Метод обновляет в хранилище переданный экземпляр класса {@link Film}
      *
      * @param newFilm экземпляр класса {@link Film} для обновления
-     * @return обновленный экземпляр класса {@link Film} из хранилища
      */
     void updateFilm(Film newFilm);
 
@@ -94,6 +131,14 @@ public interface FilmStorage {
     void addGenre(Long filmId, Long genreId);
 
     /**
+     * Метод добавляет режиссера фильму
+     *
+     * @param filmId идентификатор фильма
+     * @param directorId идентификатор режиссера
+     */
+    void addDirector(Long filmId, Long directorId);
+
+    /**
      * Метод удаляет жанр из фильма
      *
      * @param filmId идентификатор фильма
@@ -102,12 +147,12 @@ public interface FilmStorage {
     void removeGenre(Long filmId, Long genreId);
 
     /**
-     * Метод добавляет фильму переданный рейтинг
+     * Метод удаляет режиссера из фильма
      *
      * @param filmId идентификатор фильма
-     * @param ratingId идентификатор рейтинга
+     * @param directorId идентификатор режиссера
      */
-    void addRating(Long filmId, Long ratingId);
+    void removeDirector(Long filmId, Long directorId);
 
     /**
      * Метод удаляет с фильма переданный рейтинг

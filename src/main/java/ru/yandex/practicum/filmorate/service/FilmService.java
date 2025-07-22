@@ -1,8 +1,12 @@
 package ru.yandex.practicum.filmorate.service;
 
 import jakarta.validation.ValidationException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Year;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -12,23 +16,31 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.model.Genre;
-import ru.yandex.practicum.filmorate.model.Mpa;
-import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.dal.director.DirectorStorage;
+import ru.yandex.practicum.filmorate.dal.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
 import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.dal.mpa.MpaStorage;
 import ru.yandex.practicum.filmorate.dal.user.UserStorage;
-import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
+import ru.yandex.practicum.filmorate.dto.director.DirectorDto;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
+import ru.yandex.practicum.filmorate.dto.film.NewFilmRequest;
+import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
 import ru.yandex.practicum.filmorate.dto.genre.GenreDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
-import ru.yandex.practicum.filmorate.dto.film.UpdateFilmRequest;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.mapper.DirectorMapper;
 import ru.yandex.practicum.filmorate.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.mapper.GenreMapper;
 import ru.yandex.practicum.filmorate.mapper.UserMapper;
+import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.Feed;
+import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.Mpa;
+import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.enums.EventTypes;
+import ru.yandex.practicum.filmorate.model.enums.OperationTypes;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -43,6 +55,8 @@ public class FilmService {
     private final UserStorage userStorage;
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
+    private final DirectorStorage directorStorage;
+    private final FeedStorage feedStorage;
 
     /**
      * Метод возвращает коллекцию {@link FilmDto}
@@ -72,6 +86,34 @@ public class FilmService {
         return result;
     }
 
+    public Collection<FilmDto> findCommon(Long userId, Long friendId) {
+        log.debug("Поиск общих фильмов на уровне сервиса");
+
+        // Проверяем наличие пользователя
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+
+        // Проверяем наличие друга
+        User friend = userStorage.findById(friendId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + friendId + " не найден"));
+
+        Collection<Film> searchResult = filmStorage.findCommon(user.getId(), friend.getId());
+        log.debug("Получена коллекция общих фильмов размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция общих фильмов преобразована. Размер преобразованной коллекции: {}",
+                result.size());
+
+        log.debug("Возврат коллекции общих фильмов на уровень контроллера");
+        return result;
+    }
+
     /**
      * Метод получает список из {@link FilmDto} на основе размера коллекции {@link FilmDto#getLikes()}
      *
@@ -79,18 +121,34 @@ public class FilmService {
      * @return результирующая коллекция
      * @throws ValidationException если передано пустой размер возвращаемой коллекции
      */
-    public Collection<FilmDto> findPopular(Integer count) throws ValidationException {
+    public Collection<FilmDto> findPopular(Integer count, Long genreId, Integer year) throws ValidationException {
         log.debug("Поиск топ фильмов на уровне сервиса");
-
-        // Если аннотация в параметре контроллера была проигнорирована (запуск тестов напрямую без Mock)
-        count = count == null ? 10 : count;
 
         // Если передано отрицательное значение
         if (count <= 0) {
             throw new ValidationException("Значение count должно быть больше нуля");
         }
 
-        Collection<Film> searchResult = filmStorage.findPopular(count);
+        // Жанр должен существовать, если указан
+        if (genreId != null) {
+            Genre genre = genreStorage.findById(genreId)
+                    .orElseThrow(() -> new NotFoundException("Жанр с id " + genreId + " не найден"));
+            log.debug("Для поиска топ-фильмов указан жанр с id {}", genre.getId());
+        } else {
+            log.debug("Жанр для поиска топ-фильмов не указан");
+        }
+
+        // Год должен быть в рамках диапазона, если указан
+        if (year != null) {
+            if (year < 1895 || year > Year.now().getValue()) {
+                throw new ValidationException("Передан некорректный год: " + year);
+            }
+            log.debug("Для поиска топ-фильмов указан год {}", year);
+        } else {
+            log.debug("Год для поиска топ-фильмов не указан");
+        }
+
+        Collection<Film> searchResult = filmStorage.findPopular(count, genreId, year);
         log.debug("Получена коллекция топ-фильмов размером {}", searchResult.size());
 
         Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
@@ -103,6 +161,98 @@ public class FilmService {
         log.debug("Найденная коллекция топ-фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
 
         log.debug("Возврат коллекции топ-фильмов на уровень контроллера");
+        return result;
+    }
+
+    public Collection<FilmDto> findSearchResults(String query, String by) {
+        log.debug("Поиск фильмов по вхождению строки в перечисленные поля");
+
+        if (query == null || query.trim().isBlank()) {
+            log.debug("Передана пустая строка поиска. Возвращаем пустую коллекцию");
+            return new ArrayList<>();
+        }
+
+        if (by == null || by.trim().isBlank()) {
+            log.debug("Передан пустой список полей. Возвращаем пустую коллекцию");
+            return new ArrayList<>();
+        }
+
+        Collection<Film> searchResult = filmStorage.findSearchResult(query, by);
+        log.debug("На уровень сервиса после поиска подстроки вернулась коллекция фильмов размером {}",
+                searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция фильмов преобразована. Размер преобразованной коллекции: {}", result.size());
+
+        log.debug("Возврат коллекции фильмов на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает коллекцию {@link FilmDto} на основе {@link FilmDto#getDirectors()}
+     *
+     * @param directorId идентификатор режиссера
+     * @param sortBy последовательность полей сортировки
+     * @return коллекция {@link FilmDto}
+     */
+    public Collection<FilmDto> findByDirectorId(Long directorId, String sortBy) {
+        log.debug("Поиск фильмов по режиссеру на уровне сервиса");
+
+        if (directorId == null) {
+            throw new ValidationException("Передан пустой directorId");
+        } else {
+            log.debug("Передан id режиссера: {}", directorId);
+        }
+
+        log.debug("Передана последовательность полей сортировки: {}",
+                (sortBy == null || sortBy.isBlank()) ? "null" : sortBy);
+
+        Director director = directorStorage.findById(directorId)
+                .orElseThrow(() -> new NotFoundException("Режиссер с id " + directorId + " не найден"));
+
+        Collection<Film> searchResult = filmStorage.findByDirectorId(director.getId(), sortBy);
+        log.debug("Получена коллекция фильмов по режиссеру размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto film : result) {
+            // Заполняем коллекции
+            completeDto(film);
+        }
+        log.debug("Найденная коллекция фильмов по режиссеру преобразована. Размер после преобразования: {}",
+                result.size());
+
+        log.debug("Возврат результатов поиска фильмов по режиссеру на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает коллекцию рекомендованных к просмотру {@link FilmDto}
+     *
+     * @param userId идентификатор пользователя
+     * @return список рекомендованных к просмотру фильмов
+     */
+    public Collection<FilmDto> findUserRecommendations(Long userId) {
+        log.debug("Поиск рекомендованных фильмов на уровне сервиса");
+
+        Collection<Film> searchResult = filmStorage.findUserRecommendations(userId);
+        log.debug("Получена коллекция рекомендованных фильмов размером {}", searchResult.size());
+
+        Collection<FilmDto> result = searchResult.stream().map(FilmMapper::mapToFilmDto).toList();
+        // Перебираем полученную коллекцию
+        for (FilmDto filmDto : result) {
+            // Заполняем коллекции
+            completeDto(filmDto);
+        }
+        log.debug("Найденная коллекция рекомендованных фильмов преобразована. Размер после преобразования: {}",
+                result.size());
+
+        log.debug("Возврат результатов поиска рекомендаций в сервис пользователей");
         return result;
     }
 
@@ -235,6 +385,17 @@ public class FilmService {
         log.debug("Добавляем пользователя с id {} в коллекцию любителей фильма с id {}", user.getId(), film.getId());
         filmStorage.addLike(film.getId(), user.getId());
 
+        log.debug("Регистрируем событие LIKE ADD");
+        Feed feed = Feed.builder()
+                .entityId(filmId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.LIKE)
+                .operationType(OperationTypes.ADD)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие LIKE ADD зарегистрировано");
+
         log.debug("Возврат результата добавления лайка на уровень контроллера");
     }
 
@@ -270,6 +431,17 @@ public class FilmService {
         // Удаляем лайк пользователя
         log.debug("Удаляем фильм с id {} из коллекции пользователя с id {}", film.getId(), user.getId());
         filmStorage.removeLike(film.getId(), user.getId());
+
+        log.debug("Регистрируем событие LIKE REMOVE");
+        Feed feed = Feed.builder()
+                .entityId(filmId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.LIKE)
+                .operationType(OperationTypes.REMOVE)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие LIKE REMOVE зарегистрировано");
 
         log.debug("Возврат результата удаления лайка на уровень контроллера");
     }
@@ -468,6 +640,9 @@ public class FilmService {
 
             // Заполняем коллекцию лайков фильма
             completeLikes(dto);
+
+            // Заполняем коллекцию режиссеров
+            completeDirectors(dto);
         }
     }
 
@@ -508,5 +683,19 @@ public class FilmService {
         // Устанавливаем полученную коллекцию фильму
         dto.setLikes(likes);
         log.debug("Полученная коллекция лайков установлена фильму");
+    }
+
+    private void completeDirectors(FilmDto dto) {
+        log.debug("Заполнение коллекции режиссеров фильма");
+
+        // Получаем список режиссеров фильма
+        Set<DirectorDto> directors = directorStorage.findByFilmId(dto.getId()).stream()
+                .map(DirectorMapper::mapToDirectorDto)
+                .collect(Collectors.toSet());
+        log.debug("Для фильма с id {} получена коллекция режиссеров размером {}", dto.getId(), directors.size());
+
+        // Устанавливаем полученную коллекцию фильму
+        dto.setDirectors(directors);
+        log.debug("Полученная коллекция режиссеров установлена фильму");
     }
 }

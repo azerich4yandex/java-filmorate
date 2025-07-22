@@ -97,4 +97,33 @@ public class UserServiceTest {
         Collection<UserDto> afterDelete = userService.findAll(10, 0);
         assertNotEquals(beforeDelete.size(), afterDelete.size());
     }
+
+    @DisplayName("Операции с дружбой пользователей")
+    @Test
+    public void friendshipTest() {
+        UserDto addedDto = userService.create(UserMapper.mapToNewUserRequest(user1));
+        assertNotNull(addedDto);
+        assertNotNull(addedDto.getId());
+        user1 = UserMapper.mapToUser(addedDto);
+        assertNotNull(user1);
+        assertNotNull(user1.getId());
+
+        addedDto = userService.create(UserMapper.mapToNewUserRequest(user2));
+        assertNotNull(addedDto);
+        assertNotNull(addedDto.getId());
+        user2 = UserMapper.mapToUser(addedDto);
+        assertNotNull(user2);
+        assertNotNull(user2.getId());
+        assertNotEquals(user1.getId(), user2.getId());
+
+        userService.addFriend(user1.getId(), user2.getId());
+
+        Collection<UserDto> friendsBeforeDelete = userService.findFriends(user1.getId());
+
+        userService.removeFriend(user1.getId(), user2.getId());
+
+        Collection<UserDto> friendsAfterDelete = userService.findFriends(user1.getId());
+
+        assertNotEquals(friendsBeforeDelete, friendsAfterDelete);
+    }
 }
