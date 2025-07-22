@@ -24,12 +24,4 @@ public class UpdateReviewRequest {
     public boolean hasPositive() {
         return isPositive != null;
     }
-
-    public boolean hasUserId() {
-        return userId != null;
-    }
-
-    public boolean hasFilmId() {
-        return filmId != null;
-    }
 }

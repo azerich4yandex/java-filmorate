@@ -41,23 +41,28 @@ public final class UserMapper {
 
     public static UserDto mapToUserDto(User user) {
 
-        return UserDto.builder().id(user.getId()).email(user.getEmail()).login(user.getLogin())
-                .name(user.getName()).birthday(user.getBirthday()).build();
+        return UserDto.builder()
+                .id(user.getId())
+                .email(user.getEmail().strip())
+                .login(user.getLogin().strip())
+                .name(user.getName().strip())
+                .birthday(user.getBirthday())
+                .build();
     }
 
     public static UserShortDto mapToUserShortDto(User user) {
         return UserShortDto.builder()
                 .id(user.getId())
-                .name(user.getName())
+                .name(user.getName().strip())
                 .build();
     }
 
     public static NewUserRequest mapToNewUserRequest(User user) {
 
         return NewUserRequest.builder()
-                .email(user.getEmail())
-                .login(user.getLogin())
-                .name(user.getName())
+                .email(user.getEmail().strip())
+                .login(user.getLogin().strip())
+                .name(user.getName().strip())
                 .birthday(user.getBirthday())
                 .build();
     }
@@ -68,13 +73,13 @@ public final class UserMapper {
         }
 
         if (request.hasEmail()) {
-            user.setEmail(request.getEmail());
+            user.setEmail(request.getEmail().strip());
         }
         if (request.hasLogin()) {
-            user.setLogin(request.getLogin());
+            user.setLogin(request.getLogin().strip());
         }
         if (request.hasName()) {
-            user.setName(request.getName());
+            user.setName(request.getName().strip());
         }
         if (request.hasBirthday()) {
             user.setBirthday(request.getBirthday());

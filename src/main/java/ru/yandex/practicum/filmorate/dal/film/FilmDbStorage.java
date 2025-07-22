@@ -879,8 +879,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
      */
     private String getClause(String field, String query) {
         return switch (field) {
-            case "TITLE" -> "(f.FULL_NAME LIKE '%" + query + "%')";
-            case "DIRECTOR" -> "(d.FULL_NAME LIKE '%" + query + "%')";
+            case "TITLE" -> "(UPPER(f.FULL_NAME) LIKE '%" + query.toUpperCase() + "%')";
+            case "DIRECTOR" -> "(UPPER(d.FULL_NAME) LIKE '%" + query.toUpperCase() + "%')";
             default -> throw new RuntimeException("Для поиска подстроки указано неизвестное имя поля " + field);
         };
     }

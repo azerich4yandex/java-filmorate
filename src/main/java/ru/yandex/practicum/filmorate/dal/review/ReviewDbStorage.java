@@ -30,7 +30,7 @@ public class ReviewDbStorage extends BaseDbStorage<Review> implements ReviewStor
                       r.FILM_ID,
                       r.CONTENT,
                       r.IS_POSITIVE
-             ORDER BY useful DESC, r.ID DESC
+             ORDER BY useful DESC, r.ID ASC
              LIMIT :size
             OFFSET :from
             """;
@@ -49,7 +49,7 @@ public class ReviewDbStorage extends BaseDbStorage<Review> implements ReviewStor
                       r.FILM_ID,
                       r.CONTENT,
                       r.IS_POSITIVE
-             ORDER BY useful DESC, r.ID DESC
+             ORDER BY useful DESC, r.ID ASC
              LIMIT :count
             """;
     private static final String GET_REVIEW_BY_ID_QUERY = """
@@ -74,9 +74,7 @@ public class ReviewDbStorage extends BaseDbStorage<Review> implements ReviewStor
             """;
     private static final String UPDATE_REVIEW_QUERY = """
             UPDATE REVIEWS
-               SET USER_ID = :userId,
-                   FILM_ID = :filmId,
-                   CONTENT = :content,
+               SET CONTENT = :content,
                    IS_POSITIVE = :isPositive
              WHERE ID = :reviewId
             """;
@@ -186,8 +184,6 @@ public class ReviewDbStorage extends BaseDbStorage<Review> implements ReviewStor
         log.debug("Передан идентификатор отзыва {}", newReview.getId());
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("userId", newReview.getUserId(), Types.BIGINT)
-                .addValue("filmId", newReview.getFilmId(), Types.BIGINT)
                 .addValue("content", newReview.getContent(), Types.NVARCHAR)
                 .addValue("isPositive", newReview.isPositive(), Types.BOOLEAN)
                 .addValue("reviewId", newReview.getId(), Types.BIGINT);

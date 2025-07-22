@@ -246,6 +246,10 @@ public class UserService {
         User user = UserMapper.mapToUser(request);
         log.debug("Переданная модель преобразована");
 
+        log.debug("Подготовка переданной модели");
+        prepare(user);
+        log.debug("Подготовка переданной модели завершена");
+
         log.debug("Валидация переданной модели");
         validate(user);
         log.debug("Валидация модели завершена");
@@ -284,6 +288,10 @@ public class UserService {
         log.debug("В хранилище найден пользователь по id {}", existingUser.getId());
 
         User updatedUser = UserMapper.updateUserFields(existingUser, request);
+
+        log.debug("Подготовка измененной модели");
+        prepare(updatedUser);
+        log.debug("Подготовка измененной модели завершена");
 
         // Проверяем переданного пользователя
         log.debug("Валидация обновленной модели");
@@ -604,5 +612,48 @@ public class UserService {
         // Устанавливаем полученную коллекцию пользователю
         dto.setFriends(friends);
         log.debug("Полученная коллекция друзей установлена пользователю");
+    }
+
+    /**
+     * Метод очищает поля пользователя от мусорных символов
+     *
+     * @param user экземпляр сущности {@link User}
+     */
+    private void prepare(User user) {
+        // Подготовка email
+        log.debug("До обработки: user.getEmail().length() = {}", user.getEmail().length());
+        user.setEmail(prepareStringValue(user.getEmail()));
+        log.debug("После обработки: user.getEmail().length() = {}", user.getEmail().length());
+
+        // Подготовка логина
+        log.debug("До обработки: user.getLogin().length() = {}", user.getLogin().length());
+        user.setLogin(prepareStringValue(user.getLogin()));
+        log.debug("После обработки: user.getLogin().length() = {}", user.getLogin().length());
+
+        // Подготовка имени
+        log.debug("До обработки: user.getName().length() = {}", user.getName().length());
+        user.setName(prepareStringValue(user.getName()));
+        log.debug("После обработки: user.getName().length() = {}", user.getName().length());
+    }
+
+    /**
+     * Метод очищает переданную строку от мусорных символов
+     *
+     * @param text строка для очистки
+     * @return строка после очистки
+     */
+    private String prepareStringValue(String text) {
+        // Удаляем переносы
+        while (text.contains("\\n")) {
+            text = text.replace("\\n", "\\s");
+        }
+
+        // Удаляем двойные пробелы
+        while (text.contains("\\s\\s")) {
+            text = text.replace("\\s\\s", "\\s");
+        }
+
+        // Возвращаем результат
+        return text.trim().strip();
     }
 }

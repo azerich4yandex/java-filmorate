@@ -39,7 +39,7 @@ public class ReviewController {
     @GetMapping("/{id}")
     public ResponseEntity<ReviewDto> findById(@PathVariable(name = "id") Long reviewId) {
         log.info("Поиск отзыва по идентификатору на уровне контроллера");
-        log.debug("Передан id: {}", reviewId);
+        log.debug("Передан id: {}", reviewId == null ? "null" : reviewId);
 
         ReviewDto result = reviewService.findById(reviewId);
         log.debug("На уровень контроллера вернулся отзыв с id {}", result.getReviewId());
@@ -56,13 +56,18 @@ public class ReviewController {
      * @return коллекция {@link ReviewDto}
      */
     @GetMapping
-    public ResponseEntity<Collection<ReviewDto>> findByFilmId(@RequestParam(name = "filmId") Long filmId,
+    public ResponseEntity<Collection<ReviewDto>> findByFilmId(@RequestParam(name = "filmId", required = false) Long filmId,
                                                               @RequestParam(name = "count", defaultValue = "10") Integer count) {
         log.info("Поиск отзывов по идентификатору фильма на уровне контроллера");
-        log.debug("Передан максимальный размер коллекции: {}", count);
-        log.debug("Передан id фильма: {}", filmId);
+        log.debug("Передан максимальный размер коллекции: {}", count == null ? "null" : count);
+        log.debug("Передан id фильма: {}", filmId == null ? "null" : filmId);
 
-        Collection<ReviewDto> result = reviewService.findByFilmId(filmId, count);
+        Collection<ReviewDto> result;
+        if (filmId != null) {
+            result = reviewService.findByFilmId(filmId, count);
+        } else {
+            result = reviewService.findAll(count, 0);
+        }
         log.debug("На уровень контроллера вернулась коллекция отзывов размером {}", result.size());
 
         log.debug("Возврат результатов поиска отзывов по идентификатору фильма на уровень клиента");
