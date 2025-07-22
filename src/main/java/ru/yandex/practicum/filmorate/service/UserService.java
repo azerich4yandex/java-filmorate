@@ -1,6 +1,8 @@
 package ru.yandex.practicum.filmorate.service;
 
 import jakarta.validation.ValidationException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
@@ -11,15 +13,21 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.dal.user.UserStorage;
+import ru.yandex.practicum.filmorate.dto.feed.FeedDto;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
 import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UserDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.mapper.FeedMapper;
 import ru.yandex.practicum.filmorate.mapper.UserMapper;
+import ru.yandex.practicum.filmorate.model.Feed;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.enums.EventTypes;
+import ru.yandex.practicum.filmorate.model.enums.OperationTypes;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -31,6 +39,7 @@ public class UserService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private final UserStorage userStorage;
+    private final FeedStorage feedStorage;
     private final FilmService filmService;
 
     /**
@@ -143,12 +152,12 @@ public class UserService {
     }
 
     /**
-     * Метод возвращает коллекцию рекомендаций для {@link FilmDto}
+     * Метод возвращает коллекцию рекомендаций {@link FilmDto} для пользователя
      *
      * @param userId идентификатор пользователя
      * @return коллекция фильмов для просмотра
      */
-    public Collection<FilmDto> getUserRecommendations(Long userId) {
+    public Collection<FilmDto> findUserRecommendations(Long userId) {
         log.debug("Запрос рекомендаций на уровне сервиса");
         log.debug("Передан идентификатор пользователя: {}", userId);
 
@@ -164,6 +173,33 @@ public class UserService {
         log.debug("На уровень сервиса вернулась коллекция рекомендованных фильмов размером {}", result.size());
 
         log.debug("Возврат результатов поиска рекомендаций на уровень контроллера");
+        return result;
+    }
+
+    /**
+     * Метод возвращает коллекцию {@link FeedDto} для пользователя
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция событий
+     */
+    public Collection<FeedDto> findFeed(Long userId) {
+        log.debug("Запрос списка событий на уровне сервиса");
+        log.debug("Передан  id  пользователя: {}", userId);
+
+        if (userId == null) {
+            throw new ValidationException("Id пользователя должен быть указан");
+        }
+
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден"));
+
+        Collection<Feed> searchResult = feedStorage.findByUserId(user.getId());
+        log.debug("На уровень сервиса вернулась коллекция событий размером {}", searchResult.size());
+
+        Collection<FeedDto> result = searchResult.stream().map(FeedMapper::mapToFeedDto).toList();
+        log.debug("Коллекция событий преобразована. Размер преобразованной коллекции {}", result.size());
+
+        log.debug("Возврат ленты событий на уровень контроллера");
         return result;
     }
 
@@ -303,6 +339,17 @@ public class UserService {
             throw new RuntimeException("Во время добавления в друзья произошла непредвиденная ошибка");
         }
 
+        log.debug("Регистрируем событие FRIEND ADD");
+        Feed feed = Feed.builder()
+                .entityId(friendId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.FRIEND)
+                .operationType(OperationTypes.ADD)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие FRIEND ADD зарегистрировано");
+
         log.debug("Возвращаем результат добавления на уровень контроллера");
     }
 
@@ -341,6 +388,17 @@ public class UserService {
         } else {
             throw new RuntimeException("Во время удаления из друзей произошла непредвиденная ошибка");
         }
+
+        log.debug("Регистрируем событие FRIEND REMOVE");
+        Feed feed = Feed.builder()
+                .entityId(friendId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.FRIEND)
+                .operationType(OperationTypes.REMOVE)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие FRIEND REMOVE зарегистрировано");
 
         log.debug("Возвращаем результат удаления на уровень контроллера");
     }

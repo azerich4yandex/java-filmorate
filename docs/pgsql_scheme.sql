@@ -17,6 +17,9 @@ START 1 CACHE 1 NO CYCLE;
 CREATE SEQUENCE IF NOT EXISTS seq_directors INCREMENT BY 1 MINVALUE 1
 START 1 CACHE 1 NO CYCLE;
 
+CREATE SEQUENCE IF NOT EXISTS seq_feed INCREMENT BY 1 MINVALUE 1
+START 1 CACHE 1 NO CYCLE;
+
 -- Создание таблиц
 CREATE TABLE IF NOT EXISTS users
 (
@@ -159,6 +162,24 @@ CREATE TABLE IF NOT EXISTS films_directors (
 COMMENT ON TABLE films_directors IS 'Связь фильмов и режиссеров';
 COMMENT ON COLUMN films_directors.film_id IS 'Идентификатор фильма';
 COMMENT ON COLUMN films_directors.director_id IS 'Идентификатор режиссера';
+
+CREATE TABLE IF NOT EXISTS feed (
+  event_id integer DEFAULT nextval('seq_feed') NOT NULL,
+  entity_id integer NOT NULL,
+  user_id integer NOT NULL,
+  time_field timestamp NOT NULL,
+  event_type text NOT NULL,
+  operation_type text NOT NULL,
+  CONSTRAINT feed_pk PRIMARY KEY (event_id),
+  CONSTRAINT feed_users_user_id_fk FOREIGN KEY (user_id) REFERENCES users (id)
+);
+COMMENT ON TABLE feed IS 'Лента событий';
+COMMENT ON COLUMN feed.event_id IS 'Идентификатор записи';
+COMMENT ON COLUMN feed.entity_id IS 'Идентификатор обработанной сущности';
+COMMENT ON COLUMN feed.user_id IS 'Идентификатор пользователя';
+COMMENT ON COLUMN feed.time_field IS 'Метка времени';
+COMMENT ON COLUMN feed.event_type IS 'Тип события';
+COMMENT ON COLUMN feed.operation_type IS 'Тип операции';
 
 -- Заполнение справочников
 WITH prepared_data AS
