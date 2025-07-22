@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import ru.yandex.practicum.filmorate.dto.feed.FeedDto;
 import ru.yandex.practicum.filmorate.dto.film.FilmDto;
 import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
@@ -99,10 +100,27 @@ public class UserController {
     public ResponseEntity<Collection<FilmDto>> getUserRecommendations(@PathVariable(name = "id") Long userId) {
         log.info("Поиск рекомендаций для пользователя");
         log.debug("Передан  id пользователя: {}", userId);
-        Collection<FilmDto> result = userService.getUserRecommendations(userId);
+        Collection<FilmDto> result = userService.findUserRecommendations(userId);
         log.debug("На уровень контроллера вернулась коллекция рекомендаций размером {}", result.size());
 
         log.info("Возврат результатов поиска рекомендаций на уровень клиента");
+        return new ResponseEntity<>(result, HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /users/{id}/feed
+     *
+     * @param userId идентификатор пользователя
+     * @return коллекция событий пользователя
+     */
+    @GetMapping("/{id}/feed")
+    public ResponseEntity<Collection<FeedDto>> getFeed(@PathVariable(name = "id") Long userId) {
+        log.info("Поиск событий пользователя на уровне контроллера");
+        log.debug("Передан  id  пользователя: {}", userId);
+        Collection<FeedDto> result = userService.findFeed(userId);
+        log.debug("На уровень контроллера вернулась коллекция событий размером {}", result.size());
+
+        log.info("Возврат ленты событий на уровень клиента");
         return new ResponseEntity<>(result, HttpStatus.OK);
     }
 

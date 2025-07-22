@@ -1,10 +1,13 @@
 package ru.yandex.practicum.filmorate.service;
 
 import jakarta.validation.ValidationException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Collection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dal.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
 import ru.yandex.practicum.filmorate.dal.review.ReviewStorage;
 import ru.yandex.practicum.filmorate.dal.user.UserStorage;
@@ -13,9 +16,12 @@ import ru.yandex.practicum.filmorate.dto.review.ReviewDto;
 import ru.yandex.practicum.filmorate.dto.review.UpdateReviewRequest;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.mapper.ReviewMapper;
+import ru.yandex.practicum.filmorate.model.Feed;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Review;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.enums.EventTypes;
+import ru.yandex.practicum.filmorate.model.enums.OperationTypes;
 
 @Slf4j
 @Service
@@ -25,6 +31,7 @@ public class ReviewService {
     private final ReviewStorage reviewStorage;
     private final UserStorage userStorage;
     private final FilmStorage filmStorage;
+    private final FeedStorage feedStorage;
 
     /**
      * Метод возвращает коллекцию {@link ReviewDto}
@@ -85,6 +92,7 @@ public class ReviewService {
 
     /**
      * Метод возвращает экземпляр класса {@link ReviewDto}, найденный по идентификатору
+     *
      * @param reviewId идентификатор отзыва
      * @return экземпляр класса {@link ReviewDto}
      */
@@ -103,7 +111,8 @@ public class ReviewService {
     }
 
     /**
-     * Метод проверяет полученную модель и передает для сохранения на уровень хранилища, после чего сохраненную модель возвращает на уровень контроллера
+     * Метод проверяет полученную модель и передает для сохранения на уровень хранилища, после чего сохраненную модель
+     * возвращает на уровень контроллера
      *
      * @param request несохраненный экземпляр {@link NewReviewRequest}
      * @return сохраненный экземпляр {@link ReviewDto}
@@ -122,12 +131,24 @@ public class ReviewService {
         ReviewDto result = ReviewMapper.mapToReviewDto(review);
         log.debug("Сохранённая модель преобразована");
 
+        log.debug("Регистрируем событие REVIEW ADD");
+        Feed feed = Feed.builder()
+                .entityId(result.getReviewId())
+                .userId(request.getUserId())
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.REVIEW)
+                .operationType(OperationTypes.ADD)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие REVIEW ADD зарегистрировано");
+
         log.debug("Возврат результатов добавления на уровень контроллера");
         return result;
     }
 
     /**
-     * Метод проверяет полученную модель и передает для обновления на уровень хранилища, после чего сохраненную модель возвращает на уровень контроллера
+     * Метод проверяет полученную модель и передает для обновления на уровень хранилища, после чего сохраненную модель
+     * возвращает на уровень контроллера
      *
      * @param request несохраненный экземпляр класса {@link UpdateReviewRequest}
      * @return обновленный экземпляр класса {@link ReviewDto}
@@ -154,6 +175,17 @@ public class ReviewService {
 
         ReviewDto result = ReviewMapper.mapToReviewDto(updatedReview);
         log.debug("Обновленная модель преобразована");
+
+        log.debug("Регистрируем событие REVIEW UPDATE");
+        Feed feed = Feed.builder()
+                .entityId(result.getReviewId())
+                .userId(result.getUserId())
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.REVIEW)
+                .operationType(OperationTypes.UPDATE)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие REVIEW UPDATE зарегистрировано");
 
         log.debug("Возврат результата обновления на уровень контроллера");
         return result;
@@ -317,6 +349,17 @@ public class ReviewService {
         reviewStorage.deleteReview(review.getId());
         log.debug("Отзыв удален на уровне сервиса");
 
+        log.debug("Регистрируем событие REVIEW REMOVE");
+        Feed feed = Feed.builder()
+                .entityId(review.getId())
+                .userId(review.getUserId())
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.REVIEW)
+                .operationType(OperationTypes.REMOVE)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие REVIEW REMOVE зарегистрировано");
+
         log.debug("Возврат результатов удаления отзыва на уровень контроллера");
     }
 
@@ -376,7 +419,8 @@ public class ReviewService {
             throw new ValidationException("Id пользователя должен быть указан");
         }
 
-        User user = userStorage.findById(userId).orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
+        User user = userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь с id " + userId + " не найден в хранилище"));
 
         log.debug("Передано корректное значение userId: {}", user.getId());
         log.debug("Валидация пользователя успешно завершена");
@@ -394,7 +438,8 @@ public class ReviewService {
             throw new ValidationException("Id фильма должен быть указан");
         }
 
-        Film film = filmStorage.findById(filmId).orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден в хранилище"));
+        Film film = filmStorage.findById(filmId)
+                .orElseThrow(() -> new NotFoundException("Фильм с id " + filmId + " не найден в хранилище"));
 
         log.debug("Передано корректное значение filmId: {}", film.getId());
         log.debug("Валидация фильма успешно завершена");

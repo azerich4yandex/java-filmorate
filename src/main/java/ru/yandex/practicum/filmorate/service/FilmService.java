@@ -1,6 +1,8 @@
 package ru.yandex.practicum.filmorate.service;
 
 import jakarta.validation.ValidationException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
@@ -15,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dal.director.DirectorStorage;
+import ru.yandex.practicum.filmorate.dal.feed.FeedStorage;
 import ru.yandex.practicum.filmorate.dal.film.FilmStorage;
 import ru.yandex.practicum.filmorate.dal.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.dal.mpa.MpaStorage;
@@ -31,10 +34,13 @@ import ru.yandex.practicum.filmorate.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.mapper.GenreMapper;
 import ru.yandex.practicum.filmorate.mapper.UserMapper;
 import ru.yandex.practicum.filmorate.model.Director;
+import ru.yandex.practicum.filmorate.model.Feed;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Genre;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.model.enums.EventTypes;
+import ru.yandex.practicum.filmorate.model.enums.OperationTypes;
 
 /**
  * Класс предварительной обработки и валидации сущностей {@link User} на уровне сервиса
@@ -50,6 +56,7 @@ public class FilmService {
     private final MpaStorage mpaStorage;
     private final GenreStorage genreStorage;
     private final DirectorStorage directorStorage;
+    private final FeedStorage feedStorage;
 
     /**
      * Метод возвращает коллекцию {@link FilmDto}
@@ -378,6 +385,17 @@ public class FilmService {
         log.debug("Добавляем пользователя с id {} в коллекцию любителей фильма с id {}", user.getId(), film.getId());
         filmStorage.addLike(film.getId(), user.getId());
 
+        log.debug("Регистрируем событие LIKE ADD");
+        Feed feed = Feed.builder()
+                .entityId(filmId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.LIKE)
+                .operationType(OperationTypes.ADD)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие LIKE ADD зарегистрировано");
+
         log.debug("Возврат результата добавления лайка на уровень контроллера");
     }
 
@@ -413,6 +431,17 @@ public class FilmService {
         // Удаляем лайк пользователя
         log.debug("Удаляем фильм с id {} из коллекции пользователя с id {}", film.getId(), user.getId());
         filmStorage.removeLike(film.getId(), user.getId());
+
+        log.debug("Регистрируем событие LIKE REMOVE");
+        Feed feed = Feed.builder()
+                .entityId(filmId)
+                .userId(userId)
+                .timestamp(Timestamp.from(Instant.now()))
+                .eventType(EventTypes.LIKE)
+                .operationType(OperationTypes.REMOVE)
+                .build();
+        feedStorage.addFeed(feed);
+        log.debug("Событие LIKE REMOVE зарегистрировано");
 
         log.debug("Возврат результата удаления лайка на уровень контроллера");
     }
