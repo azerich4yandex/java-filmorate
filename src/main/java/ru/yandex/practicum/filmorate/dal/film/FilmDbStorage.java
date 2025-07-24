@@ -65,22 +65,23 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             """;
     private static final String GET_POPULAR_FILMS_QUERY = """
             SELECT f.ID,
-            	   f.FULL_NAME,
-            	   f.DESCRIPTION,
-            	   f.DURATION,
-            	   f.RELEASE_DATE,
-            	   f.RATING_ID,
-            	   r.FULL_NAME AS rating_name,
-            	   AVG(uf.MARK) AS rate
+                   f.FULL_NAME,
+                   f.DESCRIPTION,
+                   f.RELEASE_DATE,
+                   f.DURATION,
+                   f.RATING_ID,
+                   r.FULL_NAME AS rating_name,
+                   COUNT(uf.USER_ID) AS likes,
+                   NVL(AVG(uf.MARK), 0) AS rate
               FROM FILMS f
-             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
               LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
+              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
               LEFT JOIN FILMS_GENRES fg ON f.ID = fg.FILM_ID
-              LEFT JOIN GENRES g ON fg.GENRE_ID = g.ID
-             WHERE (:genreId IS NULL OR g.ID = :genreId)
-               AND (:year IS NULL OR YEAR(f.RELEASE_DATE) = :year)
-             GROUP BY f.ID, r.ID
-             ORDER BY rate DESC
+             WHERE (fg.GENRE_ID = :genreId OR :genreId IS NULL)
+               AND (YEAR(f.RELEASE_DATE) = :year OR :year IS NULL)
+             GROUP BY f.ID,
+                      r.ID
+             ORDER BY rate DESC, likes DESC, f.ID ASC
              LIMIT :count
             """;
     private static final String GET_FILMS_WITH_LIKE_QUERY = """
@@ -93,7 +94,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    r.FULL_NAME AS rating_name,
                    NVL(COUNT(uf.USER_ID), 0) AS likes
               FROM FILMS f
-              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
               LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
               LEFT JOIN FILMS_DIRECTORS fd ON f.ID = fd.FILM_ID
               LEFT JOIN DIRECTORS d ON fd.DIRECTOR_ID = d.ID
@@ -107,10 +108,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    f.RATING_ID,
                    r.FULL_NAME as rating_name
               FROM FILMS_GENRES fg
-              LEFT JOIN RATINGS r
-                ON f.RATING_ID = r.ID
-             INNER JOIN FILMS f
-                ON fg.FILM_ID = f.ID
+             INNER JOIN RATINGS r ON f.RATING_ID = r.ID
+             INNER JOIN FILMS f ON fg.FILM_ID = f.ID
              WHERE fg.GENRE_ID = :genreId
              ORDER BY f.ID
             """;
@@ -123,7 +122,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    f.RATING_ID,
                    r.FULL_NAME AS rating_name
               FROM FILMS f
-              LEFT JOIN RATINGS r
+             INNER JOIN RATINGS r
                 ON f.RATING_ID = r.ID
              WHERE r.ID = :ratingId
             """;
@@ -134,8 +133,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    f.RELEASE_DATE,
                    f.DURATION,
                    f.RATING_ID,
-                   r.FULL_NAME as rating_name,
-                   NVL(COUNT(uf.ID), 0) AS likes,
+                   r.FULL_NAME AS rating_name,
                    AVG(uf.MARK) AS rate
               FROM FILMS f
              INNER JOIN FILMS_DIRECTORS fd ON f.ID = fd.FILM_ID
@@ -144,12 +142,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
               LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
              WHERE d.ID = :directorId
              GROUP BY f.ID,
-                      f.FULL_NAME,
-                      f.DESCRIPTION,
-                      f.RELEASE_DATE,
-                      f.DURATION,
-                      f.RATING_ID,
-                      r.FULL_NAME
+                      r.ID
             """;
     private static final String GET_RECOMMENDED_FILMS_QUERY = """
             SELECT f.ID,
@@ -322,8 +315,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Год релиза: {}", year == null ? "null" : year);
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("count", count)
-                .addValue("year", year).addValue("genreId", genreId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("genreId", genreId, Types.BIGINT)
+                .addValue("year", year, Types.INTEGER)
+                .addValue("count", count, Types.INTEGER);
 
         // Получаем коллекцию популярных фильмов
         Collection<Film> result = findMany(GET_POPULAR_FILMS_QUERY, parameterSource);
@@ -372,7 +367,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
         // Добавляем группировку
         stringBuilder.append(
-                "\n GROUP BY f.ID, f.FULL_NAME, f.DESCRIPTION, f.RELEASE_DATE, f.DURATION, f.RATING_ID, r.FULL_NAME");
+                "\n GROUP BY f.ID, r.ID");
 
         // Заканчиваем строку запроса сортировкой
         stringBuilder.append("\n ORDER BY likes DESC");
@@ -429,7 +424,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                 orderBy = addField(orderBy, field.toUpperCase());
             }
         } else {
-            orderBy = "LIKES DESC";
+            orderBy = "rate DESC";
         }
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
@@ -465,7 +460,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Поиск фильма по id на уровне хранилища");
 
         // Составляем набор параметров
-        MapSqlParameterSource parameterSource = new MapSqlParameterSource().addValue("filmId", filmId);
+        MapSqlParameterSource parameterSource = new MapSqlParameterSource()
+                .addValue("filmId", filmId);
 
         Optional<Film> searchResult = findOne(GET_FILM_BY_ID_QUERY, parameterSource);
         if (searchResult.isPresent()) {
@@ -867,8 +863,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     private String getOrderName(String field) {
         return switch (field) {
             case "YEAR" -> "YEAR(f.RELEASE_DATE) ASC";
-            case "LIKES" -> "LIKES DESC";
-            case "RATE" -> "RATE DESC";
+            case "LIKES", "RATE" -> "rate DESC";
             default -> throw new RuntimeException(
                     "Для сортировки результатов запроса выбрано неизвестное имя поля " + field);
         };
