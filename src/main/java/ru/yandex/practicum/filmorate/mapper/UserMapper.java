@@ -4,11 +4,11 @@ import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.dto.user.NewUserRequest;
+import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
 import ru.yandex.practicum.filmorate.dto.user.UserDto;
 import ru.yandex.practicum.filmorate.dto.user.UserShortDto;
-import ru.yandex.practicum.filmorate.dto.user.UpdateUserRequest;
+import ru.yandex.practicum.filmorate.model.User;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class UserMapper {
@@ -43,26 +43,29 @@ public final class UserMapper {
 
         return UserDto.builder()
                 .id(user.getId())
-                .email(user.getEmail().strip())
-                .login(user.getLogin().strip())
-                .name(user.getName().strip())
+                .email(user.getEmail().trim())
+                .login(user.getLogin().trim())
+                .name(user.getName().trim())
                 .birthday(user.getBirthday())
                 .build();
     }
 
     public static UserShortDto mapToUserShortDto(User user) {
+        int mark = user.getMark() > 0 ? user.getMark() : 0;
+
         return UserShortDto.builder()
                 .id(user.getId())
-                .name(user.getName().strip())
+                .name(user.getName().trim())
+                .mark(mark)
                 .build();
     }
 
     public static NewUserRequest mapToNewUserRequest(User user) {
 
         return NewUserRequest.builder()
-                .email(user.getEmail().strip())
-                .login(user.getLogin().strip())
-                .name(user.getName().strip())
+                .email(user.getEmail().trim())
+                .login(user.getLogin().trim())
+                .name(user.getName().trim())
                 .birthday(user.getBirthday())
                 .build();
     }
@@ -73,13 +76,13 @@ public final class UserMapper {
         }
 
         if (request.hasEmail()) {
-            user.setEmail(request.getEmail().strip());
+            user.setEmail(request.getEmail().trim());
         }
         if (request.hasLogin()) {
-            user.setLogin(request.getLogin().strip());
+            user.setLogin(request.getLogin().trim());
         }
         if (request.hasName()) {
-            user.setName(request.getName().strip());
+            user.setName(request.getName().trim());
         }
         if (request.hasBirthday()) {
             user.setBirthday(request.getBirthday());

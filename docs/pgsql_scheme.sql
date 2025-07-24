@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS users_films
 (
   user_id integer NOT NULL,
   film_id integer NOT NULL,
+  mark real,
   CONSTRAINT users_films_pk PRIMARY KEY (user_id, film_id),
   CONSTRAINT users_films_users_fk FOREIGN KEY (user_id) REFERENCES users(id),
   CONSTRAINT users_films_films_fk FOREIGN KEY (film_id) REFERENCES films(id)
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS users_films
 COMMENT ON TABLE users_films IS 'Таблица связей пользователей и фильмов';
 COMMENT ON COLUMN users_films.user_id IS 'Ссылка на идентификатор пользователя';
 COMMENT ON COLUMN users_films.film_id IS 'Ссылка на идентификатор фильма';
+COMMENT ON COLUMN users_films.mark IS 'Оценка пользователя';
 
 CREATE TABLE IF NOT EXISTS friends
 (

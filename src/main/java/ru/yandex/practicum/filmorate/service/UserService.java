@@ -621,19 +621,13 @@ public class UserService {
      */
     private void prepare(User user) {
         // Подготовка email
-        log.debug("До обработки: user.getEmail().length() = {}", user.getEmail().length());
         user.setEmail(prepareStringValue(user.getEmail()));
-        log.debug("После обработки: user.getEmail().length() = {}", user.getEmail().length());
 
         // Подготовка логина
-        log.debug("До обработки: user.getLogin().length() = {}", user.getLogin().length());
         user.setLogin(prepareStringValue(user.getLogin()));
-        log.debug("После обработки: user.getLogin().length() = {}", user.getLogin().length());
 
         // Подготовка имени
-        log.debug("До обработки: user.getName().length() = {}", user.getName().length());
         user.setName(prepareStringValue(user.getName()));
-        log.debug("После обработки: user.getName().length() = {}", user.getName().length());
     }
 
     /**
@@ -654,6 +648,6 @@ public class UserService {
         }
 
         // Возвращаем результат
-        return text.trim().strip();
+        return text.trim().trim();
     }
 }

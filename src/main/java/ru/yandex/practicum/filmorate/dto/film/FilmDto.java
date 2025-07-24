@@ -19,6 +19,7 @@ public class FilmDto {
     private LocalDate releaseDate;
     private Integer duration;
     private MpaDto mpa;
+    private Double rate;
     private Set<GenreDto> genres;
     private Set<UserShortDto> likes;
     private Set<DirectorDto> directors;

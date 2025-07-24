@@ -362,7 +362,7 @@ public class FilmService {
      * @throws ValidationException в случае ошибок валидации
      * @throws NotFoundException если фильм или пользователь не найдены
      */
-    public void addLike(Long filmId, Long userId) throws ValidationException, NotFoundException {
+    public void addLike(Long filmId, Long userId, Double mark) throws ValidationException, NotFoundException {
         log.debug("Добавление лайка фильму на уровне сервиса");
 
         if (filmId == null) {
@@ -371,6 +371,10 @@ public class FilmService {
 
         if (userId == null) {
             throw new ValidationException("Передан пустой id пользователя");
+        }
+
+        if (mark != null && (mark <= 0 || mark > 10)) {
+            throw new ValidationException("Оценка должна находиться в пределах от 1 до 10");
         }
 
         // Получаем фильм из хранилища
@@ -383,7 +387,7 @@ public class FilmService {
 
         // Добавляем пользователя в коллекцию пользователей, которым фильм понравился
         log.debug("Добавляем пользователя с id {} в коллекцию любителей фильма с id {}", user.getId(), film.getId());
-        filmStorage.addLike(film.getId(), user.getId());
+        filmStorage.addLike(film.getId(), user.getId(), mark);
 
         log.debug("Регистрируем событие LIKE ADD");
         Feed feed = Feed.builder()
@@ -643,6 +647,9 @@ public class FilmService {
 
             // Заполняем коллекцию режиссеров
             completeDirectors(dto);
+
+            // Заполняем среднюю оценку фильма
+            completeAverageRate(dto);
         }
     }
 
@@ -697,5 +704,14 @@ public class FilmService {
         // Устанавливаем полученную коллекцию фильму
         dto.setDirectors(directors);
         log.debug("Полученная коллекция режиссеров установлена фильму");
+    }
+
+    private void completeAverageRate(FilmDto dto) {
+        log.debug("Заполнение средней оценки фильма");
+
+        Double averageRate = dto.getLikes().stream().mapToDouble(UserShortDto::getMark).average().orElse(0);
+        dto.setRate(averageRate);
+
+        log.debug("Заполнение средней оценки фильма завершено");
     }
 }
