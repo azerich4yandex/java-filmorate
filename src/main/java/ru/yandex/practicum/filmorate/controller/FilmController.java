@@ -193,14 +193,37 @@ public class FilmController {
      * @param userId идентификатор пользователя
      */
     @PutMapping("/{id}/like/{userId}")
-    public ResponseEntity<Void> addLike(@PathVariable(name = "id") Long filmId, @PathVariable Long userId) {
+    public ResponseEntity<Void> addLike(@PathVariable(name = "id") Long filmId,
+                                        @PathVariable(name = "userId") Long userId) {
         log.info("Запрошено добавление лайка на уровне контроллера");
         log.debug("Передан id фильма: {}", filmId);
         log.debug("Передан id пользователя: {}", userId);
 
-        filmService.addLike(filmId, userId);
+        filmService.addLike(filmId, userId, null);
 
         log.info("Возврат результата добавления на уровень клиента");
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+    /**
+     * Обработка GET-запроса для /films/{filmId}/like/{userId}/{mark}
+     *
+     * @param filmId идентификатор фильма
+     * @param userId идентификатор пользователя
+     * @param mark оценка пользователя
+     */
+    @PutMapping("/{id}/like/{userId}/{mark}")
+    public ResponseEntity<Void> addRate(@PathVariable(name = "id") Long filmId,
+                                        @PathVariable(name = "userId") Long userId,
+                                        @PathVariable(name = "mark") Double mark) {
+        log.info("Запрошено добавление оценки на уровне контроллера");
+        log.debug("Передан  id  фильма: {}", filmId);
+        log.debug("Передан  id  пользователя: {}", userId);
+        log.debug("Передана оценка: {}", mark);
+
+        filmService.addLike(filmId, userId, mark);
+
+        log.debug("Возврат результатов добавления оценки на уровень клиента");
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

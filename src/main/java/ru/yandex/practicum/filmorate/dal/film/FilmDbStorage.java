@@ -21,6 +21,9 @@ import ru.yandex.practicum.filmorate.model.Genre;
 @Component
 public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
 
+    private static final Integer MIN_NEGATIVE_RATE = 1;
+    private static final Integer MAX_NEGATIVE_RATE = 5;
+    private static final Integer MAX_POSITIVE_RATE = 10;
     private static final String GET_ALL_FILMS_QUERY = """
             SELECT f.ID,
                    f.FULL_NAME,
@@ -68,7 +71,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
             	   f.RELEASE_DATE,
             	   f.RATING_ID,
             	   r.FULL_NAME AS rating_name,
-            	   COUNT(uf.ID) AS cnt
+            	   AVG(uf.MARK) AS rate
               FROM FILMS f
              INNER JOIN RATINGS r ON f.RATING_ID = r.ID
               LEFT JOIN USERS_FILMS uf ON f.ID = uf.FILM_ID
@@ -77,7 +80,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
              WHERE (:genreId IS NULL OR g.ID = :genreId)
                AND (:year IS NULL OR YEAR(f.RELEASE_DATE) = :year)
              GROUP BY f.ID, r.ID
-             ORDER BY CNT  DESC
+             ORDER BY rate DESC
              LIMIT :count
             """;
     private static final String GET_FILMS_WITH_LIKE_QUERY = """
@@ -132,7 +135,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    f.DURATION,
                    f.RATING_ID,
                    r.FULL_NAME as rating_name,
-                   NVL(COUNT(uf.ID), 0) AS likes
+                   NVL(COUNT(uf.ID), 0) AS likes,
+                   AVG(uf.MARK) AS rate
               FROM FILMS f
              INNER JOIN FILMS_DIRECTORS fd ON f.ID = fd.FILM_ID
              INNER JOIN DIRECTORS d ON d.ID = fd.DIRECTOR_ID
@@ -154,22 +158,30 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                    f.RELEASE_DATE,
                    f.DURATION,
                    f.RATING_ID,
-                   r.FULL_NAME as rating_name
+                   r.FULL_NAME as rating_name,
+                   COUNT(uf4.USER_ID) AS likes,
+                   NVL(AVG(uf4.MARK), 0) AS rate
               FROM USERS_FILMS uf1
-             INNER JOIN USERS_FILMS uf2 ON uf1.FILM_ID = uf2.FILM_ID
-             INNER JOIN USERS_FILMS uf3 ON uf2.USER_ID = uf3.USER_ID
-             INNER JOIN FILMS f ON uf3.FILM_ID = f.ID
-              LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+              INNER JOIN USERS_FILMS uf2 ON uf1.FILM_ID = uf2.FILM_ID
+              INNER JOIN USERS_FILMS uf3 ON uf2.USER_ID = uf3.USER_ID
+              INNER JOIN FILMS f ON uf3.FILM_ID = f.ID
+               LEFT JOIN RATINGS r ON f.RATING_ID = r.ID
+               LEFT JOIN USERS_FILMS uf4 ON f.ID = uf4.FILM_ID
              WHERE uf1.USER_ID = :userId
+                --
+               AND (((uf1.MARK >= :minNegativeRate AND uf1.MARK <= :maxNegativeRate) AND (uf2.MARK >= :minNegativeRate AND uf2.MARK <= :maxNegativeRate))
+                OR  ((uf1.MARK > :maxNegativeRate AND uf1.MARK <= :maxPositiveRate) AND (uf2.MARK > :maxNegativeRate AND uf2.MARK <= :maxPositiveRate))
+                OR  (uf1.MARK IS NULL AND uf2.MARK IS NULL))
+               AND uf2.USER_ID != uf1.USER_ID
+                --
+               AND (((uf2.MARK >= :minNegativeRate AND uf2.MARK <= :maxNegativeRate) AND (uf3.MARK >= :minNegativeRate AND uf3.MARK <= :maxNegativeRate))
+                OR  ((uf2.MARK > :maxNegativeRate AND uf2.MARK <= :maxPositiveRate) AND (uf3.MARK > :maxNegativeRate AND uf3.MARK <= :maxPositiveRate))
+                OR  (uf2.MARK IS NULL AND uf3.MARK IS NULL))
                AND uf3.FILM_ID NOT IN (SELECT uf.FILM_ID FROM USERS_FILMS uf WHERE uf.USER_ID = uf1.USER_ID)
              GROUP BY f.ID,
-                      f.FULL_NAME,
-                      f.DESCRIPTION,
-                      f.RELEASE_DATE,
-                      f.DURATION,
-                      f.RATING_ID,
-                      r.FULL_NAME
-             ORDER BY f.ID
+                      r.ID
+            HAVING (AVG(uf4.MARK) > :maxNegativeRate OR uf4.MARK IS NULL)
+             ORDER BY rate DESC
             """;
     private static final String GET_FILM_BY_ID_QUERY = """
             SELECT f.ID,
@@ -215,8 +227,8 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
                AND fd.DIRECTOR_ID = :directorId
             """;
     private static final String INSERT_LIKE_QUERY = """
-            INSERT INTO USERS_FILMS (FILM_ID, USER_ID)
-            VALUES (:filmId, :userId)
+            INSERT INTO USERS_FILMS (FILM_ID, USER_ID, MARK)
+            VALUES (:filmId, :userId, :mark)
             """;
     private static final String INSERT_GENRE_TO_FILM_QUERY = """
             INSERT INTO FILMS_GENRES (FILM_ID, GENRE_ID)
@@ -436,7 +448,10 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         log.debug("Передан идентификатор пользователя: {}", userId);
 
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("userId", userId, Types.BIGINT);
+                .addValue("userId", userId, Types.BIGINT)
+                .addValue("minNegativeRate", MIN_NEGATIVE_RATE, Types.BIGINT)
+                .addValue("maxNegativeRate", MAX_NEGATIVE_RATE, Types.BIGINT)
+                .addValue("maxPositiveRate", MAX_POSITIVE_RATE, Types.INTEGER);
 
         Collection<Film> result = findMany(GET_RECOMMENDED_FILMS_QUERY, parameterSource);
         log.debug("Получена коллекция рекомендованных фильмов размером {}", result.size());
@@ -522,23 +537,27 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
     }
 
     @Override
-    public void addLike(Long filmId, Long userId) {
+    public void addLike(Long filmId, Long userId, Double mark) {
         log.debug("Добавление лайка на уровне хранилища");
         log.debug("Идентификатор фильма: {}", filmId);
         log.debug("Идентификатор пользователя: {}", userId);
+        log.debug("Оценка фильма: {}", mark);
 
         // Составляем набор параметров
         MapSqlParameterSource parameterSource = new MapSqlParameterSource()
-                .addValue("filmId", filmId)
-                .addValue("userId", userId);
+                .addValue("filmId", filmId, Types.BIGINT)
+                .addValue("userId", userId, Types.BIGINT);
 
         if (!exists(GET_LIKE_ID_QUERY, parameterSource)) {
             log.debug("Лайк будет добавлен в БД");
 
+            parameterSource.addValue("mark", mark, Types.REAL);
+
             boolean isInserted = insertWithOutReturnId(INSERT_LIKE_QUERY, parameterSource);
             if (!isInserted) {
                 throw new RuntimeException(
-                        "Не удалось сохранить лайк от пользователя с id " + userId + " фильму с id " + filmId);
+                        "Не удалось сохранить оценку " + mark + " от пользователя с id " + userId + " фильму с id "
+                                + filmId);
             } else {
                 log.debug("Фильму с id {} добавлен лайк от пользователя с id {}", filmId, userId);
             }
@@ -849,6 +868,7 @@ public class FilmDbStorage extends BaseDbStorage<Film> implements FilmStorage {
         return switch (field) {
             case "YEAR" -> "YEAR(f.RELEASE_DATE) ASC";
             case "LIKES" -> "LIKES DESC";
+            case "RATE" -> "RATE DESC";
             default -> throw new RuntimeException(
                     "Для сортировки результатов запроса выбрано неизвестное имя поля " + field);
         };

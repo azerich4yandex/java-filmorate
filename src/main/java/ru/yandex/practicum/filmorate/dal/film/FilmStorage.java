@@ -112,7 +112,7 @@ public interface FilmStorage {
      * @param filmId идентификатор фильма
      * @param userId идентификатор пользователя
      */
-    void addLike(Long filmId, Long userId);
+    void addLike(Long filmId, Long userId, Double mark);
 
     /**
      * Метод удаляет лайк с фильма

@@ -20,7 +20,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   0 as MARK
               FROM USERS u
              ORDER BY u.ID
              LIMIT :size
@@ -31,7 +32,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   0 as MARK
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
              WHERE f.USER_ID = :userId
@@ -41,7 +43,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   0 as MARK
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
              WHERE f.USER_ID = :userId
@@ -50,7 +53,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   0 as MARK
               FROM FRIENDS f
              INNER JOIN USERS u ON f.OTHER_ID = u.ID
              WHERE f.USER_ID = :friendId
@@ -60,7 +64,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   uf.MARK
               FROM USERS_FILMS uf
              INNER JOIN USERS u ON uf.USER_ID = u.ID
              WHERE uf.FILM_ID = :filmId
@@ -71,7 +76,8 @@ public class UserDbStorage extends BaseDbStorage<User> implements UserStorage {
                    u.EMAIL,
                    u.LOGIN,
                    u.FULL_NAME,
-                   u.BIRTHDAY
+                   u.BIRTHDAY,
+                   0 as MARK
               FROM USERS u
              WHERE u.ID = :userId
             """;
