@@ -38,8 +38,9 @@ public class DirectorController {
      * @return коллекция {@link DirectorDto}
      */
     @GetMapping
-    public ResponseEntity<Collection<DirectorDto>> findAll(@RequestParam(name = "size", required = false, defaultValue = "10") Integer size,
-                                                           @RequestParam(name = "from", required = false, defaultValue = "0") Integer from) {
+    public ResponseEntity<Collection<DirectorDto>> findAll(
+            @RequestParam(name = "size", required = false, defaultValue = "100") Integer size,
+            @RequestParam(name = "from", required = false, defaultValue = "0") Integer from) {
         log.info("Запрос всех режиссеров на уровне контроллера");
         log.debug("Размер коллекции: {}", size);
         log.debug("Стартовый номер элемента: {}", from);
