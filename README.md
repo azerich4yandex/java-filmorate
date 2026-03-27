@@ -1,3 +1,84 @@
+# Film-o-Rate
+
+> 🎬 Сервис для оценки фильмов: пользователи могут ставить лайки, добавлять фильмы, управлять друзьями.
+
+## Технологический стек
+- **Java** 21
+- **Spring Boot** 3.4.x
+- **H2** (test) / **PostgreSQL** 16.x (prod)
+- **Lombok**, **Logbook**, **Hibernate/JPA**
+- **Maven**
+
+## Быстрый старт
+
+```bash
+# Клонируем репозиторий
+git clone https://github.com/ru.yandex.practicum/filmorate.git
+cd filmorate
+
+# Собираем и запускаем приложение (H2)
+mvn clean package
+java -jar target/filmorate-0.0.1-SNAPSHOT.jar
+```
+
+Приложение будет доступно по адресу: `http://localhost:8080`.
+
+### Docker‑подход для PostgreSQL
+
+```bash
+docker run --name filmorate-db \
+  -e POSTGRES_PASSWORD=postgres \
+  -p 5432:5432 \
+  postgres:16.9-alpine
+```
+
+> Схема БД находится в `docs/pgsql_scheme.sql`. После запуска контейнера можно выполнить:
+>
+> ```bash
+> psql -h localhost -U postgres -d filmorate -f docs/pgsql_scheme.sql
+> ```
+
+## API
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| `GET /users` | `UserController.findAll(...)` | Получить список пользователей |
+| `POST /users` | `UserController.create(@RequestBody User)` | Создать пользователя |
+| … | … | … |
+
+> Полные схемы запросов уже описаны в разделе **Примеры запросов** ниже.
+
+## Примеры запросов
+
+```bash
+# Получить 10 пользователей (curl)
+curl -X GET "http://localhost:8080/users?size=10&from=0" \
+     -H "Accept: application/json"
+
+# Добавить лайк фильму
+curl -X POST "http://localhost:8080/films/1/likes/2" \
+     -H "Content-Type: application/json" \
+     -d '{"mark": 8}'
+```
+
+## Схема БД
+
+![scheme.png](docs/scheme.png)
+
+См. подробное описание таблиц в `docs/scheme.md` и скрипты развертывания:
+- H2 – `docs/h2_scheme.sql`
+- PostgreSQL – `docs/pgsql_scheme.sql`
+
+## Лицензия
+MIT © filmorate
+
+## Как участвовать
+1. Fork репозитория.
+2. Создайте ветку с названием `feature/<описание>`.
+3. Пишите код согласно стилю, комментируйте и запускайте тесты (`mvn test`).
+4. Откройте Pull Request.
+
+Если возникнут вопросы – откройте issue или напишите в Discord‑канал проекта.
 # Структура БД приложения
 
 ![scheme.png](docs/scheme.png)
